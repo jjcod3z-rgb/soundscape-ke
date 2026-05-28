@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { usePacks, formatKES, uid, type Pack, useAdminAuth } from "@/lib/store";
-import { useState } from "react";
-import { getUploadUrlFn } from "@/lib/server-actions";
+import { formatKES, uid, type Pack, useAdminAuth } from "@/lib/store";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/admin/uploads")({ component: AdminUploads });
 
@@ -15,8 +15,41 @@ function fileToDataUrl(file: File): Promise<string> {
 }
 
 function AdminUploads() {
-  const [packs, setPacks] = usePacks();
+  const [packs, setPacks] = useState<Pack[]>([]);
+  const [loading, setLoading] = useState(true);
   const [token] = useAdminAuth();
+
+  useEffect(() => {
+    async function loadPacks() {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .eq("is_active", true);
+
+        if (error) throw error;
+
+        const mapped: Pack[] = (data || []).map((row) => ({
+          id: row.id,
+          title: row.name,
+          description: row.description || "",
+          price: row.price_kes,
+          coverDataUrl: row.r2_preview_url || undefined,
+          fileName: row.slug ? `${row.slug}.wav` : undefined,
+          fileDataUrl: row.r2_product_url || undefined,
+          createdAt: new Date(row.created_at).getTime(),
+        }));
+
+        setPacks(mapped);
+      } catch (err) {
+        console.error("Failed to load products:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadPacks();
+  }, []);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState(1500);
@@ -34,9 +67,12 @@ function AdminUploads() {
       let coverUrl = undefined;
       if (cover) {
         setStatusText("Uploading cover image...");
-        const res = await getUploadUrlFn({
-          data: { filename: cover.name, contentType: cover.type, token },
+        const uRes = await fetch("/.netlify/functions/get-upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: cover.name, contentType: cover.type, token }),
         });
+        const res = await uRes.json();
         if (res.success && res.uploadUrl) {
           await fetch(res.uploadUrl, {
             method: "PUT",
@@ -53,13 +89,16 @@ function AdminUploads() {
       let fileUrl = undefined;
       if (file) {
         setStatusText("Uploading main file (this may take a while)...");
-        const res = await getUploadUrlFn({
-          data: {
+        const uRes = await fetch("/.netlify/functions/get-upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             filename: file.name,
             contentType: file.type || "application/octet-stream",
             token,
-          },
+          }),
         });
+        const res = await uRes.json();
         if (res.success && res.uploadUrl) {
           await fetch(res.uploadUrl, {
             method: "PUT",
@@ -79,15 +118,32 @@ function AdminUploads() {
       }
 
       setStatusText("Saving pack...");
+      const pRes = await fetch("/.netlify/functions/create-pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          price,
+          coverUrl,
+          fileName: file?.name,
+          fileUrl,
+          token,
+        }),
+      });
+      const res = await pRes.json();
+      if (!res.success) throw new Error(res.error || "Failed to save pack to Supabase");
+
+      const savedProduct = res.product;
       const pack: Pack = {
-        id: uid(),
-        title,
-        description,
-        price: Number(price),
-        coverDataUrl: coverUrl,
+        id: savedProduct.id,
+        title: savedProduct.name,
+        description: savedProduct.description || "",
+        price: savedProduct.price_kes,
+        coverDataUrl: savedProduct.r2_preview_url || undefined,
         fileName: file?.name,
-        fileDataUrl: fileUrl,
-        createdAt: Date.now(),
+        fileDataUrl: savedProduct.r2_product_url || undefined,
+        createdAt: new Date(savedProduct.created_at).getTime(),
       };
 
       setPacks((arr) => [pack, ...arr]);
@@ -105,8 +161,20 @@ function AdminUploads() {
     }
   }
 
-  function remove(id: string) {
-    if (confirm("Delete this pack?")) setPacks((arr) => arr.filter((p) => p.id !== id));
+  async function remove(id: string) {
+    if (!confirm("Delete this pack?")) return;
+    try {
+      const dRes = await fetch("/.netlify/functions/delete-pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, token }),
+      });
+      const res = await dRes.json();
+      if (!res.success) throw new Error(res.error || "Failed to delete pack");
+      setPacks((arr) => arr.filter((p) => p.id !== id));
+    } catch (err: unknown) {
+      alert("Error deleting pack: " + (err as Error).message);
+    }
   }
 
   return (
@@ -168,11 +236,16 @@ function AdminUploads() {
       <section>
         <h2 className="font-display text-2xl font-bold">Existing packs ({packs.length})</h2>
         <ul className="mt-6 space-y-4">
-          {packs.map((p) => (
-            <li
-              key={p.id}
-              className="flex flex-col sm:flex-row items-start justify-between gap-4 rounded-xl border border-border/60 bg-card p-4 shadow-sm"
-            >
+          {loading ? (
+            <li className="text-center py-6 text-muted-foreground">Loading packs...</li>
+          ) : packs.length === 0 ? (
+            <li className="text-center py-6 text-muted-foreground">No packs uploaded yet.</li>
+          ) : (
+            packs.map((p) => (
+              <li
+                key={p.id}
+                className="flex flex-col sm:flex-row items-start justify-between gap-4 rounded-xl border border-border/60 bg-card p-4 shadow-sm"
+              >
               <div className="flex gap-4">
                 {p.coverDataUrl ? (
                   <img
@@ -215,7 +288,8 @@ function AdminUploads() {
                 Delete
               </button>
             </li>
-          ))}
+            ))
+          )}
         </ul>
       </section>
     </div>

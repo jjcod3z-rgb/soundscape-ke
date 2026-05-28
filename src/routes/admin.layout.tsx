@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSiteConfig, useAdminAuth } from "@/lib/store";
 import { useState } from "react";
-import { getUploadUrlFn } from "@/lib/server-actions";
 
 export const Route = createFileRoute("/admin/layout")({ component: AdminLayoutEditor });
 
@@ -39,9 +38,12 @@ function AdminLayoutEditor() {
 
       if (heroImage) {
         setStatusText("Uploading new hero image...");
-        const res = await getUploadUrlFn({
-          data: { filename: heroImage.name, contentType: heroImage.type, token },
+        const uRes = await fetch("/.netlify/functions/get-upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: heroImage.name, contentType: heroImage.type, token }),
         });
+        const res = await uRes.json();
         if (res.success && res.uploadUrl) {
           await fetch(res.uploadUrl, {
             method: "PUT",

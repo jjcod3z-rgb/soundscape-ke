@@ -1,7 +1,6 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useAdminAuth } from "@/lib/store";
 import { useState, useEffect } from "react";
-import { loginFn, verifyTokenFn } from "@/lib/server-actions";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — Kelele Sound" }] }),
@@ -23,10 +22,21 @@ function AdminLayout() {
         setIsVerifying(false);
         return;
       }
-      const res = await verifyTokenFn({ data: token });
-      setIsAuthenticated(res.authed);
-      if (!res.authed) setToken(null);
-      setIsVerifying(false);
+      try {
+        const res = await fetch("/.netlify/functions/verify-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+        setIsAuthenticated(data.authed);
+        if (!data.authed) setToken(null);
+      } catch {
+        setIsAuthenticated(false);
+        setToken(null);
+      } finally {
+        setIsVerifying(false);
+      }
     }
     checkAuth();
   }, [token, setToken]);
@@ -34,12 +44,21 @@ function AdminLayout() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setErr("");
-    const res = await loginFn({ data: pw });
-    if (res.success && res.token) {
-      setToken(res.token);
-      setIsAuthenticated(true);
-    } else {
-      setErr(res.error || "Login failed");
+    try {
+      const res = await fetch("/.netlify/functions/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json();
+      if (data.success && data.token) {
+        setToken(data.token);
+        setIsAuthenticated(true);
+      } else {
+        setErr(data.error || "Login failed");
+      }
+    } catch (err: unknown) {
+      setErr((err as Error).message || "Login failed");
     }
   }
 

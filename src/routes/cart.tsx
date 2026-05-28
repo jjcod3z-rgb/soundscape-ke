@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteHeader, SiteFooter } from "@/components/SiteHeader";
 import {
-  usePacks,
   useCart,
   useLastReceipt,
   usePurchases,
@@ -10,9 +9,12 @@ import {
   makeLicenseKey,
   useEmails,
   useSiteConfig,
+  type Pack,
 } from "@/lib/store";
-import { useMemo, useState, useEffect } from "react";
-import { createPesapalOrderFn } from "@/lib/server-actions";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { PesaPalPortal } from "@/components/PesaPalPortal";
+import { DownloadManager } from "@/components/DownloadManager";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({
@@ -22,79 +24,98 @@ export const Route = createFileRoute("/cart")({
 });
 
 function CartPage() {
-  const [packs] = usePacks();
+  const [packs, setPacks] = useState<Pack[]>([]);
+  const [loading, setLoading] = useState(true);
   const [cart, setCart] = useCart();
+
+  useEffect(() => {
+    async function loadPacks() {
+      if (cart.length === 0) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .in("id", cart);
+
+        if (error) throw error;
+
+        const mapped: Pack[] = (data || []).map((row) => ({
+          id: row.id,
+          title: row.name,
+          description: row.description || "",
+          price: row.price_kes,
+          coverDataUrl: row.r2_preview_url || undefined,
+          fileName: row.slug ? `${row.slug}.wav` : undefined,
+          fileDataUrl: row.r2_product_url || undefined,
+          createdAt: new Date(row.created_at).getTime(),
+        }));
+
+        setPacks(mapped);
+      } catch (err) {
+        console.error("Failed to load cart products:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadPacks();
+  }, [cart]);
   const [, setPurchases] = usePurchases();
   const [, setReceipt] = useLastReceipt();
   const [, setEmails] = useEmails();
   const [config] = useSiteConfig();
   const [showCheckout, setShowCheckout] = useState(false);
-  const [iframeUrl, setIframeUrl] = useState("");
+  const [pesapalUrl, setPesapalUrl] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const cartPacks = useMemo(() => packs.filter((p) => cart.includes(p.id)), [packs, cart]);
   const total = cartPacks.reduce((s, p) => s + p.price, 0);
 
-  useEffect(() => {
-    if (window !== window.parent) {
-      const params = new URLSearchParams(window.location.search);
-      const trackingId = params.get("OrderTrackingId");
-      if (trackingId) {
-        window.parent.postMessage({ type: "PESAPAL_COMPLETE", trackingId }, window.location.origin);
-      }
-      return;
-    }
-
-    const handleMessage = (e: MessageEvent) => {
-      if (e.origin === window.location.origin && e.data?.type === "PESAPAL_COMPLETE") {
-        if (cartPacks.length > 0 && name && email) {
-          completeOrder();
-        }
-      }
-    };
-    window.addEventListener("message", handleMessage);
-
-    const params = new URLSearchParams(window.location.search);
-    const trackingId = params.get("OrderTrackingId");
-    if (trackingId && cartPacks.length > 0 && name && email) {
-      completeOrder();
-    }
-
-    return () => window.removeEventListener("message", handleMessage);
-  }, [cartPacks, name, email]);
-
-  function completeOrder() {
-    const created = cartPacks.map((p) => ({
-      id: uid(),
-      packId: p.id,
-      packTitle: p.title,
-      customerName: name,
-      customerEmail: email,
-      amount: p.price,
-      licenseKey: makeLicenseKey(),
-      createdAt: Date.now(),
-    }));
-    setPurchases((arr) => [...created, ...arr]);
-    setEmails((arr) => [
-      {
+  const handlePaymentSuccess = useCallback(
+    (orderId: string, _downloadToken?: string) => {
+      // Record purchases locally
+      const created = cartPacks.map((p) => ({
         id: uid(),
-        to: email,
-        subject: `Your ${config.brandName} order — ${created.length} pack(s)`,
-        body: `Hi ${name},\n\nThanks for your purchase. Your packs and license keys:\n\n${created
-          .map((c) => `• ${c.packTitle} — License: ${c.licenseKey}`)
-          .join("\n")}\n\n— ${config.brandName}`,
-        status: "sent",
+        packId: p.id,
+        packTitle: p.title,
+        customerName: name,
+        customerEmail: email,
+        amount: p.price,
+        licenseKey: makeLicenseKey(),
         createdAt: Date.now(),
-      },
-      ...arr,
-    ]);
-    setReceipt(email);
+      }));
+      setPurchases((arr) => [...created, ...arr]);
+      setEmails((arr) => [
+        {
+          id: uid(),
+          to: email,
+          subject: `Your ${config.brandName} order — ${created.length} pack(s)`,
+          body: `Hi ${name},\n\nThanks for your purchase. Your packs and license keys:\n\n${created
+            .map((c) => `• ${c.packTitle} — License: ${c.licenseKey}`)
+            .join("\n")}\n\n— ${config.brandName}`,
+          status: "sent" as const,
+          createdAt: Date.now(),
+        },
+        ...arr,
+      ]);
+      setReceipt(email);
+      setPesapalUrl("");
+      setCompletedOrderId(orderId);
+    },
+    [cartPacks, name, email, config.brandName, setPurchases, setEmails, setReceipt],
+  );
+
+  const handleDownloadClose = useCallback(() => {
+    setCompletedOrderId(null);
     setCart([]);
-    navigate({ to: "/thank-you" });
-  }
+    navigate({ to: "/" });
+  }, [setCart, navigate]);
 
   async function checkout(e: React.FormEvent) {
     e.preventDefault();
@@ -102,22 +123,26 @@ function CartPage() {
 
     setBusy(true);
     try {
-      const orderId = uid();
-      const res = await createPesapalOrderFn({
-        data: {
+      // Call our Netlify Function to create the order
+      const res = await fetch("/.netlify/functions/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           amount: total,
           description: `${config.brandName} - ${cartPacks.length} packs`,
           email,
           name,
-          reference: orderId,
-          callbackUrl: window.location.href,
-        },
+          productId: cartPacks[0]?.id, // For single-product orders; multi-product needs expansion
+          callbackUrl: `${window.location.origin}/.netlify/functions/pesapal-callback`,
+        }),
       });
 
-      if (res.success && res.redirectUrl) {
-        setIframeUrl(res.redirectUrl);
+      const data = await res.json();
+
+      if (data.success && data.redirectUrl) {
+        setPesapalUrl(data.redirectUrl);
       } else {
-        alert("Failed to initialize Pesapal payment: " + res.error);
+        alert("Failed to initialize payment: " + (data.error || "Unknown error"));
       }
     } catch (err: unknown) {
       alert("Checkout error: " + (err as Error).message);
@@ -126,20 +151,21 @@ function CartPage() {
     }
   }
 
-  if (iframeUrl) {
+  // Show Download Manager after successful payment
+  if (completedOrderId) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <SiteHeader />
-        <main className="flex-1">
-          <iframe
-            src={iframeUrl}
-            className="h-[800px] w-full border-none bg-white"
-            title="Pesapal Checkout"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-top-navigation allow-popups"
-          />
-        </main>
-        <SiteFooter />
-      </div>
+      <DownloadManager orderId={completedOrderId} onClose={handleDownloadClose} />
+    );
+  }
+
+  // Show PesaPal Portal when we have a redirect URL
+  if (pesapalUrl) {
+    return (
+      <PesaPalPortal
+        pesapalUrl={pesapalUrl}
+        onSuccess={handlePaymentSuccess}
+        onClose={() => setPesapalUrl("")}
+      />
     );
   }
 
@@ -153,7 +179,11 @@ function CartPage() {
         <h1 className="font-display mt-2 text-4xl font-bold">Your cart</h1>
 
         <div className="mt-10 rounded-2xl border border-border/60 bg-card p-8">
-          {cartPacks.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-10">
+              <p className="text-muted-foreground">Loading cart items...</p>
+            </div>
+          ) : cartPacks.length === 0 ? (
             <div className="text-center py-10">
               <p className="text-muted-foreground">Your cart is empty.</p>
               <Link to="/store" className="mt-4 inline-block text-primary hover:underline">
@@ -220,15 +250,15 @@ function CartPage() {
                       />
                     </svg>
                     <p>
-                      You will be redirected to Pesapal's secure checkout page to complete your
-                      payment.
+                      Payment is processed securely via PesaPal. You will complete payment inside a
+                      secure checkout window without leaving this site.
                     </p>
                   </div>
                   <button
                     disabled={busy}
                     className="mt-2 rounded-full bg-primary py-4 text-lg font-semibold text-primary-foreground shadow-[var(--glow-primary)] hover:opacity-90 transition disabled:opacity-50"
                   >
-                    {busy ? "Connecting to Pesapal..." : `Pay ${formatKES(total)}`}
+                    {busy ? "Connecting to PesaPal..." : `Pay ${formatKES(total)}`}
                   </button>
                 </form>
               )}
