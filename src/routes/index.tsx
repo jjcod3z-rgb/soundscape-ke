@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader, SiteFooter } from "@/components/SiteHeader";
-import { useSiteConfig, useAnnouncements, usePacks, formatKES } from "@/lib/store";
+import { useSiteConfig, formatKES, type Pack } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -16,12 +18,63 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
+interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+}
+
 function HomePage() {
   const [config] = useSiteConfig();
-  const [announcements] = useAnnouncements();
-  const [packs] = usePacks();
-  const featured = packs.slice(0, 3);
-  const latestNews = announcements[0];
+  const [featured, setFeatured] = useState<Pack[]>([]);
+  const [latestNews, setLatestNews] = useState<Announcement | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadHomeData() {
+      try {
+        // Fetch featured packs
+        const { data: prodData, error: prodErr } = await supabase
+          .from("products")
+          .select("*")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(3);
+
+        if (prodErr) throw prodErr;
+
+        const mapped: Pack[] = (prodData || []).map((row) => ({
+          id: row.id,
+          title: row.name,
+          description: row.description || "",
+          price: row.price_kes,
+          coverDataUrl: row.r2_preview_url || undefined,
+          files: Array.isArray(row.r2_product_urls) ? row.r2_product_urls : [],
+          createdAt: new Date(row.created_at).getTime(),
+        }));
+        setFeatured(mapped);
+
+        // Fetch latest announcement
+        const { data: annData, error: annErr } = await supabase
+          .from("announcements")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (annErr) throw annErr;
+
+        if (annData && annData.length > 0) {
+          setLatestNews(annData[0] as Announcement);
+        }
+      } catch (err) {
+        console.error("Error loading homepage data:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadHomeData();
+  }, []);
 
   return (
     <div>
@@ -75,29 +128,50 @@ function HomePage() {
           </Link>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
-          {featured.map((p) => (
-            <Link
-              key={p.id}
-              to="/store"
-              className="bg-card-grad group rounded-2xl border border-border/60 p-6 transition hover:border-primary/60"
-            >
-              <div className="mb-4 aspect-video rounded-lg bg-gradient-to-br from-primary/40 to-accent/20" />
-              <h3 className="font-display text-lg font-semibold">{p.title}</h3>
-              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
-              <p className="mt-4 font-mono text-primary">{formatKES(p.price)}</p>
-            </Link>
-          ))}
+          {loading ? (
+            <div className="col-span-full text-center text-muted-foreground py-8">
+              Loading featured sound packs...
+            </div>
+          ) : featured.length === 0 ? (
+            <div className="col-span-full text-center text-muted-foreground py-8">
+              No featured sound packs available.
+            </div>
+          ) : (
+            featured.map((p) => (
+              <Link
+                key={p.id}
+                to="/store"
+                className="bg-card-grad group flex flex-col rounded-2xl border border-border/60 p-6 transition hover:border-primary/60"
+              >
+                <div
+                  className="mb-4 aspect-video rounded-lg bg-gradient-to-br from-primary/40 to-accent/20"
+                  style={
+                    p.coverDataUrl
+                      ? {
+                          backgroundImage: `url(${p.coverDataUrl})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }
+                      : undefined
+                  }
+                />
+                <h3 className="font-display text-lg font-semibold">{p.title}</h3>
+                <p className="mt-1 line-clamp-2 flex-1 text-sm text-muted-foreground">{p.description}</p>
+                <p className="mt-4 font-mono text-primary">{formatKES(p.price)}</p>
+              </Link>
+            ))
+          )}
         </div>
       </section>
 
-      {latestNews && (
+      {!loading && latestNews && (
         <section className="mx-auto max-w-6xl px-6 pb-20">
           <div className="bg-card-grad rounded-2xl border border-border/60 p-8 md:p-12">
             <span className="font-mono text-xs uppercase tracking-[0.3em] text-primary">
               // Latest announcement
             </span>
             <h3 className="font-display mt-3 text-2xl font-bold">{latestNews.title}</h3>
-            <p className="mt-2 text-muted-foreground">{latestNews.body}</p>
+            <p className="mt-2 text-muted-foreground whitespace-pre-line">{latestNews.body}</p>
             <Link
               to="/announcements"
               className="mt-6 inline-block text-sm text-primary hover:underline"
