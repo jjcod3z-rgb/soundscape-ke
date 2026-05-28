@@ -1,11 +1,27 @@
 import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || "";
 const JWT_SECRET = process.env.JWT_SECRET || "development-secret-change-in-production";
 
 export const handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
+
+  // Early check for missing config
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY env vars");
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        success: false,
+        error: "Server misconfiguration: Supabase credentials not set. Check Netlify environment variables.",
+      }),
+    };
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   try {
     const { title, description, price, coverUrl, files, token } = JSON.parse(event.body);
@@ -13,8 +29,9 @@ export const handler = async (event) => {
     // 1. Verify admin token
     jwt.verify(token, JWT_SECRET);
 
-    // 2. Generate slug
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    // 2. Generate slug with uniqueness suffix
+    const baseSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const slug = `${baseSlug}-${Date.now().toString(36)}`;
 
     // 3. Insert into Supabase
     const { data, error } = await supabase
@@ -32,7 +49,10 @@ export const handler = async (event) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase insert error:", JSON.stringify(error));
+      throw new Error(error.message || "Database insert failed");
+    }
 
     return {
       statusCode: 200,
@@ -44,7 +64,7 @@ export const handler = async (event) => {
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ success: false, error: error.message }),
+      body: JSON.stringify({ success: false, error: error.message || "Unknown error" }),
     };
   }
 };
