@@ -1,6 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+import { getSupabaseClient } from "./supabase-client.js";
 
 async function getPesapalToken() {
   const res = await fetch("https://pay.pesapal.com/v3/api/Auth/RequestToken", {
@@ -25,6 +23,7 @@ export const handler = async (event) => {
   }
 
   try {
+    const supabase = getSupabaseClient();
     const token = await getPesapalToken();
     
     // 1. Verify with PesaPal Status API (IPN)
@@ -34,8 +33,6 @@ export const handler = async (event) => {
     const statusData = await statusRes.json();
     
     // 2. Update Supabase
-    // statusData.payment_status_description typically contains "Completed", "Failed", etc.
-    // For Sandbox it's "Completed".
     const isCompleted = statusData.payment_status_description?.toLowerCase() === "completed" || statusData.status_code === 1;
 
     // Generate a secure download token if paid

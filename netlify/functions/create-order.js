@@ -1,7 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+import { getSupabaseClient } from "./supabase-client.js";
 
 async function getPesapalToken() {
   const res = await fetch("https://pay.pesapal.com/v3/api/Auth/RequestToken", {
@@ -21,15 +18,14 @@ export const handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
 
   try {
+    const supabase = getSupabaseClient();
     const { amount, description, email, name, productId, callbackUrl } = JSON.parse(event.body);
 
     // 1. Get Pesapal Auth Token
     const token = await getPesapalToken();
 
-    // 2. Register IPN (or use a pre-registered one)
-    // To avoid registering an IPN every time, usually you register it once and store the IPN ID.
-    // For this implementation, we will register it if needed, but optimally you'd hardcode it or store it in DB.
-    const ipnUrl = process.env.URL ? `${process.env.URL}/.netlify/functions/pesapal-callback` : "https://your-domain.com/.netlify/functions/pesapal-callback";
+    // 2. Register IPN
+    const ipnUrl = process.env.URL ? `${process.env.URL}/.netlify/functions/pesapal-callback` : "https://the-sound-scape.netlify.app/.netlify/functions/pesapal-callback";
     const ipnRes = await fetch("https://pay.pesapal.com/v3/api/URLSetup/RegisterIPN", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
@@ -78,7 +74,7 @@ export const handler = async (event) => {
 
     // 5. Update Supabase with Pesapal Tracking ID
     await supabase.from("orders").update({
-      pesapal_order_id: submitData.order_tracking_id // Note: Pesapal returns order_tracking_id
+      pesapal_order_id: submitData.order_tracking_id
     }).eq("id", order.id);
 
     return { statusCode: 200, body: JSON.stringify({ success: true, redirectUrl: submitData.redirect_url, orderId: order.id }) };

@@ -1,8 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseClient } from "./supabase-client.js";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const r2 = new S3Client({
   region: "auto",
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -16,6 +15,7 @@ export const handler = async (event) => {
   if (event.httpMethod !== "GET") return { statusCode: 405, body: "Method Not Allowed" };
 
   try {
+    const supabase = getSupabaseClient();
     const { orderId } = event.queryStringParameters;
     if (!orderId) {
       return { statusCode: 400, body: JSON.stringify({ error: "Missing orderId" }) };
@@ -36,9 +36,7 @@ export const handler = async (event) => {
       return { statusCode: 410, body: JSON.stringify({ error: "Download link expired" }) };
     }
 
-    // 2. Generate signed URLs for individual files (NO ZIPPING)
-    // For this storefront, we just serve the main track for each product associated with the order.
-    // Wait, the order structure from the prompt: order has product_id.
+    // 2. Generate signed URLs for individual files
     const product = order.products;
 
     if (!product) {
@@ -52,26 +50,10 @@ export const handler = async (event) => {
     }
 
     const files = filesToSign.map(async (f) => {
-      // The stored URL might be a full R2 public URL or a local base64 fallback.
-      // If it's a base64 string, we can't sign it with S3, we just pass it through.
-      // But typically it's an R2 URL. Wait, the frontend uploads via presigned URL and gets back the full URL.
-      // But `f.url` is what we have. To sign it via S3, we need the Object Key, not the URL.
-      // Let's extract the key from the URL.
-      // URL format: https://<custom_domain>/<filename> or similar.
-      // Actually, wait! The frontend uploaded it and set `res.publicUrl`.
-      // Let's check `get-upload-url.js` to see what `publicUrl` is. 
-      // It's likely `https://${process.env.R2_PUBLIC_URL}/${key}` or similar.
-      // Let's assume `f.name` was used as the key, or we just extract the path.
-      // Wait, let's look at get-upload-url.js to be sure.
-
       let key = "";
       try {
         const urlObj = new URL(f.url);
-        // If it's a direct R2 URL (e.g. https://<account>.r2.cloudflarestorage.com/soundscape/uploads/...)
-        // we need to extract the path after the bucket name or domain.
-        // For standard S3-like URLs: /<bucket>/<key>
         if (urlObj.hostname.includes("r2.cloudflarestorage.com")) {
-            // Path is usually /<bucket_name>/<key>
             const pathParts = urlObj.pathname.split("/").filter(Boolean);
             if (pathParts[0] === process.env.R2_BUCKET_NAME) {
                key = pathParts.slice(1).join("/");
@@ -86,7 +68,6 @@ export const handler = async (event) => {
       }
 
       if (!key) {
-        // If we couldn't extract a key, we just return the original URL (e.g., local base64 fallback)
         return { name: f.name, signedUrl: f.url, type: "audio" };
       }
 
@@ -96,7 +77,7 @@ export const handler = async (event) => {
       });
       
       try {
-        const url = await getSignedUrl(r2, command, { expiresIn: 3600 }); // 1 hour
+        const url = await getSignedUrl(r2, command, { expiresIn: 3600 });
         return { name: f.name, signedUrl: url, type: "audio" };
       } catch (err) {
         console.error("Error signing url for key:", key, err);

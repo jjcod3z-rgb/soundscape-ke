@@ -1,11 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseClient } from "./supabase-client.js";
 import jwt from "jsonwebtoken";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "";
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || "";
-const JWT_SECRET = process.env.JWT_SECRET || "development-secret-change-in-production";
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const JWT_SECRET = (process.env.JWT_SECRET || "development-secret-change-in-production").replace(/^['"]|['"]$/g, "");
 
 export const handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
@@ -24,6 +20,7 @@ export const handler = async (event) => {
       };
     }
 
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from("announcements")
       .delete()

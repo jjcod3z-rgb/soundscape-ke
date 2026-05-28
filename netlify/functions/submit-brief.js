@@ -1,6 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+import { getSupabaseClient } from "./supabase-client.js";
 
 export const handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -10,6 +8,7 @@ export const handler = async (event) => {
   try {
     const { genre, duration, lyrics, customerEmail, customerPhone } = JSON.parse(event.body);
 
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from("song_briefs")
       .insert({

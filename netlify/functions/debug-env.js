@@ -20,19 +20,21 @@ export const handler = async (event) => {
     if (!val) {
       report[v] = "❌ NOT SET";
     } else {
-      // Show first 8 chars and length for verification, never the full secret
       report[v] = `✅ SET (${val.length} chars, starts with: ${val.substring(0, 8)}...)`;
     }
   }
 
-  // Also test Supabase connectivity
+  // Test Supabase connectivity with realtime disabled
   let supabaseTest = "skipped";
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
   if (url && key) {
     try {
       const { createClient } = await import("@supabase/supabase-js");
-      const supabase = createClient(url, key);
+      const supabase = createClient(url, key, {
+        realtime: false,
+        auth: { persistSession: false },
+      });
       const { data, error } = await supabase.from("products").select("id").limit(1);
       if (error) {
         supabaseTest = `❌ Query failed: ${error.message}`;
