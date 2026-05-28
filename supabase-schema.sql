@@ -59,6 +59,15 @@ create table if not exists public.song_briefs (
   created_at      timestamptz not null default now()
 );
 
+-- 4. ANNOUNCEMENTS TABLE
+-- News, releases, and updates visible on the public Announcements page
+create table if not exists public.announcements (
+  id          uuid primary key default gen_random_uuid(),
+  title       text not null,
+  body        text not null,
+  created_at  timestamptz not null default now()
+);
+
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================================
@@ -67,11 +76,17 @@ create table if not exists public.song_briefs (
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
 alter table public.song_briefs enable row level security;
+alter table public.announcements enable row level security;
 
 -- PRODUCTS: Anyone can read active products (storefront is public)
 create policy "Public can read active products"
   on public.products for select
   using (is_active = true);
+
+-- ANNOUNCEMENTS: Anyone can read announcements
+create policy "Public can read announcements"
+  on public.announcements for select
+  using (true);
 
 -- PRODUCTS: Only service_role (Netlify Functions) can insert/update/delete
 -- No additional policy needed — service_role bypasses RLS automatically.

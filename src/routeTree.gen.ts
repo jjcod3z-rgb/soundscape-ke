@@ -16,8 +16,12 @@ import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminUploadsRouteImport } from './routes/admin.uploads'
+import { Route as AdminPurchasesRouteImport } from './routes/admin.purchases'
 import { Route as AdminLayoutRouteImport } from './routes/admin.layout'
+import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
+import { Route as AdminAnnouncementsRouteImport } from './routes/admin.announcements'
 
 const StoreRoute = StoreRouteImport.update({
   id: '/store',
@@ -54,14 +58,34 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUploadsRoute = AdminUploadsRouteImport.update({
   id: '/uploads',
   path: '/uploads',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPurchasesRoute = AdminPurchasesRouteImport.update({
+  id: '/purchases',
+  path: '/purchases',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLayoutRoute = AdminLayoutRouteImport.update({
   id: '/layout',
   path: '/layout',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEmailsRoute = AdminEmailsRouteImport.update({
+  id: '/emails',
+  path: '/emails',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAnnouncementsRoute = AdminAnnouncementsRouteImport.update({
+  id: '/announcements',
+  path: '/announcements',
   getParentRoute: () => AdminRoute,
 } as any)
 
@@ -73,19 +97,26 @@ export interface FileRoutesByFullPath {
   '/cart': typeof CartRoute
   '/contact': typeof ContactRoute
   '/store': typeof StoreRoute
+  '/admin/announcements': typeof AdminAnnouncementsRoute
+  '/admin/emails': typeof AdminEmailsRoute
   '/admin/layout': typeof AdminLayoutRoute
+  '/admin/purchases': typeof AdminPurchasesRoute
   '/admin/uploads': typeof AdminUploadsRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/admin': typeof AdminRouteWithChildren
   '/announcements': typeof AnnouncementsRoute
   '/cart': typeof CartRoute
   '/contact': typeof ContactRoute
   '/store': typeof StoreRoute
+  '/admin/announcements': typeof AdminAnnouncementsRoute
+  '/admin/emails': typeof AdminEmailsRoute
   '/admin/layout': typeof AdminLayoutRoute
+  '/admin/purchases': typeof AdminPurchasesRoute
   '/admin/uploads': typeof AdminUploadsRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -96,8 +127,12 @@ export interface FileRoutesById {
   '/cart': typeof CartRoute
   '/contact': typeof ContactRoute
   '/store': typeof StoreRoute
+  '/admin/announcements': typeof AdminAnnouncementsRoute
+  '/admin/emails': typeof AdminEmailsRoute
   '/admin/layout': typeof AdminLayoutRoute
+  '/admin/purchases': typeof AdminPurchasesRoute
   '/admin/uploads': typeof AdminUploadsRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -109,19 +144,26 @@ export interface FileRouteTypes {
     | '/cart'
     | '/contact'
     | '/store'
+    | '/admin/announcements'
+    | '/admin/emails'
     | '/admin/layout'
+    | '/admin/purchases'
     | '/admin/uploads'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
-    | '/admin'
     | '/announcements'
     | '/cart'
     | '/contact'
     | '/store'
+    | '/admin/announcements'
+    | '/admin/emails'
     | '/admin/layout'
+    | '/admin/purchases'
     | '/admin/uploads'
+    | '/admin'
   id:
     | '__root__'
     | '/'
@@ -131,8 +173,12 @@ export interface FileRouteTypes {
     | '/cart'
     | '/contact'
     | '/store'
+    | '/admin/announcements'
+    | '/admin/emails'
     | '/admin/layout'
+    | '/admin/purchases'
     | '/admin/uploads'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -196,11 +242,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/uploads': {
       id: '/admin/uploads'
       path: '/uploads'
       fullPath: '/admin/uploads'
       preLoaderRoute: typeof AdminUploadsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/purchases': {
+      id: '/admin/purchases'
+      path: '/purchases'
+      fullPath: '/admin/purchases'
+      preLoaderRoute: typeof AdminPurchasesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/layout': {
@@ -210,17 +270,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLayoutRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/emails': {
+      id: '/admin/emails'
+      path: '/emails'
+      fullPath: '/admin/emails'
+      preLoaderRoute: typeof AdminEmailsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/announcements': {
+      id: '/admin/announcements'
+      path: '/announcements'
+      fullPath: '/admin/announcements'
+      preLoaderRoute: typeof AdminAnnouncementsRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminAnnouncementsRoute: typeof AdminAnnouncementsRoute
+  AdminEmailsRoute: typeof AdminEmailsRoute
   AdminLayoutRoute: typeof AdminLayoutRoute
+  AdminPurchasesRoute: typeof AdminPurchasesRoute
   AdminUploadsRoute: typeof AdminUploadsRoute
+  AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAnnouncementsRoute: AdminAnnouncementsRoute,
+  AdminEmailsRoute: AdminEmailsRoute,
   AdminLayoutRoute: AdminLayoutRoute,
+  AdminPurchasesRoute: AdminPurchasesRoute,
   AdminUploadsRoute: AdminUploadsRoute,
+  AdminIndexRoute: AdminIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

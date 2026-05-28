@@ -45,12 +45,17 @@ function AdminLayoutEditor() {
         });
         const res = await uRes.json();
         if (res.success && res.uploadUrl) {
-          await fetch(res.uploadUrl, {
-            method: "PUT",
-            body: heroImage,
-            headers: { "Content-Type": heroImage.type },
-          });
-          heroImageUrl = res.publicUrl || "";
+          try {
+            await fetch(res.uploadUrl, {
+              method: "PUT",
+              body: heroImage,
+              headers: { "Content-Type": heroImage.type },
+            });
+            heroImageUrl = res.publicUrl || "";
+          } catch (putErr) {
+            console.warn("R2 PUT upload failed for hero image, falling back to base64", putErr);
+            heroImageUrl = await fileToDataUrl(heroImage);
+          }
         } else {
           console.warn("Cloudflare upload failed, falling back to local base64", res.error);
           heroImageUrl = await fileToDataUrl(heroImage);

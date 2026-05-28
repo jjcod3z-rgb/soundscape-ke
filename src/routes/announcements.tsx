@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SiteHeader, SiteFooter } from "@/components/SiteHeader";
-import { useAnnouncements } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/announcements")({
   head: () => ({
@@ -12,8 +13,36 @@ export const Route = createFileRoute("/announcements")({
   component: AnnouncementsPage,
 });
 
+interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+}
+
 function AnnouncementsPage() {
-  const [announcements] = useAnnouncements();
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAnnouncements() {
+      try {
+        const { data, error } = await supabase
+          .from("announcements")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+        setAnnouncements(data || []);
+      } catch (err) {
+        console.error("Error fetching announcements:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAnnouncements();
+  }, []);
+
   return (
     <div>
       <SiteHeader />
@@ -23,13 +52,14 @@ function AnnouncementsPage() {
         </span>
         <h1 className="font-display mt-2 text-4xl font-bold">Announcements</h1>
         <div className="mt-10 space-y-6">
-          {announcements.length === 0 && (
+          {loading && <p className="text-muted-foreground">Loading announcements...</p>}
+          {!loading && announcements.length === 0 && (
             <p className="text-muted-foreground">Nothing posted yet.</p>
           )}
-          {announcements.map((a) => (
+          {!loading && announcements.map((a) => (
             <article key={a.id} className="bg-card-grad rounded-2xl border border-border/60 p-6">
               <time className="font-mono text-xs text-muted-foreground">
-                {new Date(a.createdAt).toLocaleDateString("en-KE", {
+                {new Date(a.created_at).toLocaleDateString("en-KE", {
                   year: "numeric",
                   month: "short",
                   day: "numeric",

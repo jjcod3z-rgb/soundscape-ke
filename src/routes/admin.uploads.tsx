@@ -73,12 +73,17 @@ function AdminUploads() {
         });
         const res = await uRes.json();
         if (res.success && res.uploadUrl) {
-          await fetch(res.uploadUrl, {
-            method: "PUT",
-            body: cover,
-            headers: { "Content-Type": cover.type },
-          });
-          coverUrl = res.publicUrl;
+          try {
+            await fetch(res.uploadUrl, {
+              method: "PUT",
+              body: cover,
+              headers: { "Content-Type": cover.type },
+            });
+            coverUrl = res.publicUrl;
+          } catch (putErr) {
+            console.warn("R2 PUT upload failed for cover, falling back to base64", putErr);
+            coverUrl = await fileToDataUrl(cover);
+          }
         } else {
           console.warn("Cloudflare upload failed, falling back to local base64", res.error);
           coverUrl = await fileToDataUrl(cover);
@@ -103,12 +108,21 @@ function AdminUploads() {
           });
           const res = await uRes.json();
           if (res.success && res.uploadUrl) {
-            await fetch(res.uploadUrl, {
-              method: "PUT",
-              body: f,
-              headers: { "Content-Type": f.type || "application/octet-stream" },
-            });
-            uploadedFiles.push({ name: f.name, url: res.publicUrl });
+            try {
+              await fetch(res.uploadUrl, {
+                method: "PUT",
+                body: f,
+                headers: { "Content-Type": f.type || "application/octet-stream" },
+              });
+              uploadedFiles.push({ name: f.name, url: res.publicUrl });
+            } catch (putErr) {
+              console.warn(`R2 PUT upload failed for ${f.name}, falling back to local base64`, putErr);
+              if (f.size > 5 * 1024 * 1024) {
+                throw new Error(`File ${f.name} is too large for local fallback. Please configure Cloudflare R2.`);
+              }
+              const dataUrl = await fileToDataUrl(f);
+              uploadedFiles.push({ name: f.name, url: dataUrl });
+            }
           } else {
             console.warn(`Cloudflare upload failed for ${f.name}, falling back to local base64`, res.error);
             if (f.size > 5 * 1024 * 1024) {
