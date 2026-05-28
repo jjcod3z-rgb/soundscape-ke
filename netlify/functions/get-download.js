@@ -51,7 +51,7 @@ export const handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ error: "No files found for this product" }) };
     }
 
-    const files = filesToSign.map((f) => {
+    const files = filesToSign.map(async (f) => {
       // The stored URL might be a full R2 public URL or a local base64 fallback.
       // If it's a base64 string, we can't sign it with S3, we just pass it through.
       // But typically it's an R2 URL. Wait, the frontend uploads via presigned URL and gets back the full URL.
