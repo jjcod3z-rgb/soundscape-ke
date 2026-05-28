@@ -45,30 +45,66 @@ export const handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ error: "Product not found" }) };
     }
 
-    const files = [
-      {
-        name: `${product.slug}.mp3`,
-        key: `products/${product.slug}/track.mp3`,
-        type: "audio",
-      },
-    ];
+    const filesToSign = Array.isArray(product.r2_product_urls) ? product.r2_product_urls : [];
 
-    const signedFiles = await Promise.all(
-      files.map(async (f) => {
-        const command = new GetObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME,
-          Key: f.key,
-        });
-        
-        try {
-          const url = await getSignedUrl(r2, command, { expiresIn: 3600 }); // 1 hour
-          return { ...f, signedUrl: url };
-        } catch (err) {
-          console.error("Error signing url for key:", f.key, err);
-          return { ...f, signedUrl: null, error: "Failed to generate link" };
+    if (filesToSign.length === 0) {
+      return { statusCode: 404, body: JSON.stringify({ error: "No files found for this product" }) };
+    }
+
+    const files = filesToSign.map((f) => {
+      // The stored URL might be a full R2 public URL or a local base64 fallback.
+      // If it's a base64 string, we can't sign it with S3, we just pass it through.
+      // But typically it's an R2 URL. Wait, the frontend uploads via presigned URL and gets back the full URL.
+      // But `f.url` is what we have. To sign it via S3, we need the Object Key, not the URL.
+      // Let's extract the key from the URL.
+      // URL format: https://<custom_domain>/<filename> or similar.
+      // Actually, wait! The frontend uploaded it and set `res.publicUrl`.
+      // Let's check `get-upload-url.js` to see what `publicUrl` is. 
+      // It's likely `https://${process.env.R2_PUBLIC_URL}/${key}` or similar.
+      // Let's assume `f.name` was used as the key, or we just extract the path.
+      // Wait, let's look at get-upload-url.js to be sure.
+
+      let key = "";
+      try {
+        const urlObj = new URL(f.url);
+        // If it's a direct R2 URL (e.g. https://<account>.r2.cloudflarestorage.com/soundscape/uploads/...)
+        // we need to extract the path after the bucket name or domain.
+        // For standard S3-like URLs: /<bucket>/<key>
+        if (urlObj.hostname.includes("r2.cloudflarestorage.com")) {
+            // Path is usually /<bucket_name>/<key>
+            const pathParts = urlObj.pathname.split("/").filter(Boolean);
+            if (pathParts[0] === process.env.R2_BUCKET_NAME) {
+               key = pathParts.slice(1).join("/");
+            } else {
+               key = pathParts.join("/");
+            }
+        } else if (process.env.R2_PUBLIC_URL && f.url.startsWith(process.env.R2_PUBLIC_URL)) {
+            key = f.url.substring(process.env.R2_PUBLIC_URL.length).replace(/^\//, "");
         }
-      })
-    );
+      } catch (e) {
+        // If it's a data URI or invalid URL, we can't sign it.
+      }
+
+      if (!key) {
+        // If we couldn't extract a key, we just return the original URL (e.g., local base64 fallback)
+        return { name: f.name, signedUrl: f.url, type: "audio" };
+      }
+
+      const command = new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: key,
+      });
+      
+      try {
+        const url = await getSignedUrl(r2, command, { expiresIn: 3600 }); // 1 hour
+        return { name: f.name, signedUrl: url, type: "audio" };
+      } catch (err) {
+        console.error("Error signing url for key:", key, err);
+        return { name: f.name, signedUrl: null, error: "Failed to generate link" };
+      }
+    });
+
+    const signedFiles = await Promise.all(files);
 
     return { statusCode: 200, body: JSON.stringify({ files: signedFiles }) };
   } catch (error) {

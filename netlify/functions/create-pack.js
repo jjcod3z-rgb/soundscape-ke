@@ -8,7 +8,7 @@ export const handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
 
   try {
-    const { title, description, price, coverUrl, fileName, fileUrl, token } = JSON.parse(event.body);
+    const { title, description, price, coverUrl, files, token } = JSON.parse(event.body);
 
     // 1. Verify admin token
     jwt.verify(token, JWT_SECRET);
@@ -26,7 +26,7 @@ export const handler = async (event) => {
         description,
         price_kes: parseInt(price, 10),
         r2_preview_url: coverUrl || null,
-        r2_product_url: fileUrl || null,
+        r2_product_urls: Array.isArray(files) ? files : [],
         is_active: true,
       })
       .select()

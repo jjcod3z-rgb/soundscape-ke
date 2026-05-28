@@ -14,7 +14,7 @@ create table if not exists public.products (
   description   text default '',
   price_kes     integer not null default 0,
   r2_preview_url text,          -- cover image / preview hosted on R2
-  r2_product_url text,          -- downloadable file hosted on R2
+  r2_product_urls jsonb default '[]'::jsonb, -- array of {name, url} objects
   metadata      jsonb default '{}',
   is_active     boolean not null default true,
   created_at    timestamptz not null default now()

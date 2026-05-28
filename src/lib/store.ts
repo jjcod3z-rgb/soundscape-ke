@@ -6,8 +6,7 @@ export type Pack = {
   description: string;
   price: number; // KES
   coverDataUrl?: string;
-  fileName?: string;
-  fileDataUrl?: string; // base64 — frontend mock
+  files?: { name: string; url: string }[];
   createdAt: number;
 };
 
@@ -148,6 +147,7 @@ function seedPacks(): Pack[] {
       title: "Savanna Combat FX",
       description: "120 punchy weapon, impact and foley samples mixed for action games.",
       price: 2500,
+      files: [],
       createdAt: Date.now() - 86400000 * 7,
     },
     {
@@ -155,6 +155,7 @@ function seedPacks(): Pack[] {
       title: "Nairobi Night UI",
       description: "Sleek UI clicks, notifications and menu transitions with neon character.",
       price: 1800,
+      files: [],
       createdAt: Date.now() - 86400000 * 3,
     },
     {
@@ -162,6 +163,7 @@ function seedPacks(): Pack[] {
       title: "Maasai Drums Loops",
       description: "Authentic percussion loops in 90/120/140 BPM, ready for adaptive scoring.",
       price: 3200,
+      files: [],
       createdAt: Date.now() - 86400000,
     },
   ];

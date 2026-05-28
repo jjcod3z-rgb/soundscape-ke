@@ -13,7 +13,7 @@ export interface Product {
   description: string;
   price_kes: number;
   r2_preview_url: string | null;
-  r2_product_url: string | null;
+  r2_product_urls: { name: string; url: string }[];
   metadata: Record<string, unknown> | null;
   is_active: boolean;
   created_at: string;

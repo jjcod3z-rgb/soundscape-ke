@@ -36,8 +36,7 @@ function StorePage() {
           description: row.description || "",
           price: row.price_kes,
           coverDataUrl: row.r2_preview_url || undefined,
-          fileName: row.slug ? `${row.slug}.wav` : undefined,
-          fileDataUrl: row.r2_product_url || undefined,
+          files: Array.isArray(row.r2_product_urls) ? row.r2_product_urls : [],
           createdAt: new Date(row.created_at).getTime(),
         }));
 

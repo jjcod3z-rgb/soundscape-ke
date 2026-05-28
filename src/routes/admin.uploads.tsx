@@ -35,8 +35,7 @@ function AdminUploads() {
           description: row.description || "",
           price: row.price_kes,
           coverDataUrl: row.r2_preview_url || undefined,
-          fileName: row.slug ? `${row.slug}.wav` : undefined,
-          fileDataUrl: row.r2_product_url || undefined,
+          files: Array.isArray(row.r2_product_urls) ? row.r2_product_urls : [],
           createdAt: new Date(row.created_at).getTime(),
         }));
 
@@ -54,7 +53,7 @@ function AdminUploads() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState(1500);
   const [cover, setCover] = useState<File | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [statusText, setStatusText] = useState("");
 
@@ -86,34 +85,38 @@ function AdminUploads() {
         }
       }
 
-      let fileUrl = undefined;
-      if (file) {
-        setStatusText("Uploading main file (this may take a while)...");
-        const uRes = await fetch("/.netlify/functions/get-upload-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filename: file.name,
-            contentType: file.type || "application/octet-stream",
-            token,
-          }),
-        });
-        const res = await uRes.json();
-        if (res.success && res.uploadUrl) {
-          await fetch(res.uploadUrl, {
-            method: "PUT",
-            body: file,
-            headers: { "Content-Type": file.type || "application/octet-stream" },
+      const uploadedFiles: { name: string; url: string }[] = [];
+      if (files.length > 0) {
+        setStatusText(`Uploading ${files.length} file(s)...`);
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i];
+          setStatusText(`Uploading file ${i + 1} of ${files.length}: ${f.name}`);
+          
+          const uRes = await fetch("/.netlify/functions/get-upload-url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: f.name,
+              contentType: f.type || "application/octet-stream",
+              token,
+            }),
           });
-          fileUrl = res.publicUrl;
-        } else {
-          console.warn("Cloudflare upload failed, falling back to local base64", res.error);
-          if (file.size > 5 * 1024 * 1024) {
-            throw new Error(
-              "File is too large for local fallback. Please configure Cloudflare R2.",
-            );
+          const res = await uRes.json();
+          if (res.success && res.uploadUrl) {
+            await fetch(res.uploadUrl, {
+              method: "PUT",
+              body: f,
+              headers: { "Content-Type": f.type || "application/octet-stream" },
+            });
+            uploadedFiles.push({ name: f.name, url: res.publicUrl });
+          } else {
+            console.warn(`Cloudflare upload failed for ${f.name}, falling back to local base64`, res.error);
+            if (f.size > 5 * 1024 * 1024) {
+              throw new Error(`File ${f.name} is too large for local fallback. Please configure Cloudflare R2.`);
+            }
+            const dataUrl = await fileToDataUrl(f);
+            uploadedFiles.push({ name: f.name, url: dataUrl });
           }
-          fileUrl = await fileToDataUrl(file);
         }
       }
 
@@ -126,8 +129,7 @@ function AdminUploads() {
           description,
           price,
           coverUrl,
-          fileName: file?.name,
-          fileUrl,
+          files: uploadedFiles,
           token,
         }),
       });
@@ -141,8 +143,7 @@ function AdminUploads() {
         description: savedProduct.description || "",
         price: savedProduct.price_kes,
         coverDataUrl: savedProduct.r2_preview_url || undefined,
-        fileName: file?.name,
-        fileDataUrl: savedProduct.r2_product_url || undefined,
+        files: Array.isArray(savedProduct.r2_product_urls) ? savedProduct.r2_product_urls : [],
         createdAt: new Date(savedProduct.created_at).getTime(),
       };
 
@@ -151,7 +152,7 @@ function AdminUploads() {
       setDescription("");
       setPrice(1500);
       setCover(null);
-      setFile(null);
+      setFiles([]);
       (document.getElementById("upload-form") as HTMLFormElement)?.reset();
     } catch (err: unknown) {
       alert("Upload error: " + (err as Error).message);
@@ -218,10 +219,11 @@ function AdminUploads() {
             />
           </label>
           <label className="text-sm font-medium text-foreground">
-            Pack file (any type, direct upload to R2)
+            Pack files (select multiple, direct upload to R2)
             <input
               type="file"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              multiple
+              onChange={(e) => setFiles(Array.from(e.target.files || []))}
               className="mt-1 w-full text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:py-2 file:font-semibold file:text-secondary-foreground hover:file:opacity-90"
             />
           </label>
@@ -266,18 +268,23 @@ function AdminUploads() {
                       {formatKES(p.price)}
                     </span>
                     <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                      {p.fileName ?? "no file"}
+                      {p.files?.length || 0} file(s)
                     </span>
                   </div>
-                  {p.fileDataUrl && (
-                    <a
-                      href={p.fileDataUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
-                    >
-                      Download / Export File
-                    </a>
+                  {p.files && p.files.length > 0 && (
+                    <div className="mt-2 flex flex-col gap-1">
+                      {p.files.map((f, i) => (
+                        <a
+                          key={i}
+                          href={f.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block text-xs font-medium text-primary hover:underline truncate max-w-[250px]"
+                        >
+                          ↓ {f.name}
+                        </a>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
