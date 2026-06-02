@@ -4,6 +4,8 @@
  */
 import { createClient } from "@supabase/supabase-js";
 
+import ws from "ws";
+
 export function getSupabaseClient() {
   const url = (process.env.SUPABASE_URL || "").replace(/^['"]|['"]$/g, "");
   const key = (process.env.SUPABASE_SERVICE_KEY || "").replace(/^['"]|['"]$/g, "");
@@ -13,7 +15,9 @@ export function getSupabaseClient() {
   }
 
   return createClient(url, key, {
-    realtime: false,           // serverless functions don't need realtime
+    realtime: {
+      transport: ws,
+    },
     auth: { persistSession: false },
   });
 }
