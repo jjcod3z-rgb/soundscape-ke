@@ -89,7 +89,7 @@ function HomePage() {
       >
         <div className="mx-auto max-w-6xl px-6 py-28 md:py-36 relative z-10">
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-primary">
-            // Kenyan Sound Studio
+            Kenyan Sound Studio
           </span>
           <h1 className="font-display mt-6 max-w-4xl text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl">
             {config.heroQuip}
@@ -119,7 +119,7 @@ function HomePage() {
         <div className="mb-10 flex items-end justify-between">
           <div>
             <span className="font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
-              // Featured
+              Featured
             </span>
             <h2 className="font-display mt-2 text-3xl font-bold">Fresh sound packs</h2>
           </div>
@@ -168,7 +168,7 @@ function HomePage() {
         <section className="mx-auto max-w-6xl px-6 pb-20">
           <div className="bg-card-grad rounded-2xl border border-border/60 p-8 md:p-12">
             <span className="font-mono text-xs uppercase tracking-[0.3em] text-primary">
-              // Latest announcement
+              Latest announcement
             </span>
             <h3 className="font-display mt-3 text-2xl font-bold">{latestNews.title}</h3>
             <p className="mt-2 text-muted-foreground whitespace-pre-line">{latestNews.body}</p>

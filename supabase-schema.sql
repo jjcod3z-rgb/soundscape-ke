@@ -116,3 +116,28 @@ create policy "Public can insert briefs"
 --   'High-quality sword clashes, explosions, and ambient battlefield sounds. Perfect for RPGs and action games.',
 --   2500
 -- );
+
+
+-- 5. SITE SETTINGS TABLE
+-- Global config like Brand Name, Hero text, and Logo URL
+create table if not exists public.site_settings (
+  id text primary key default 'global',
+  brand_name text not null default 'The-Sound-Scape',
+  hero_quip text not null default 'Sound that hits like Nairobi at night.',
+  hero_subtitle text not null default 'Premium sound packs and audio loops, crafted in Kenya. Pay in KES, download instantly.',
+  about_description text not null default 'Our unique approach to sound design...',
+  hero_image_url text default '',
+  contact_number text default '+254700213500',
+  logo_url text default ''
+);
+
+alter table public.site_settings enable row level security;
+
+-- Public can read site settings
+create policy "Public can read site settings" on public.site_settings for select using (true);
+
+-- Only service_role can update
+-- Service_role bypasses RLS so no explicit policy needed
+
+-- Insert default row
+insert into public.site_settings (id) values ('global') on conflict (id) do nothing;

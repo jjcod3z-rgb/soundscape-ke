@@ -1,14 +1,47 @@
 import { Link } from "@tanstack/react-router";
 import { useSiteConfig, useCart } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { useEffect } from "react";
 
 export function SiteHeader() {
-  const [config] = useSiteConfig();
+  const [config, setConfig] = useSiteConfig();
   const [cart] = useCart();
+
+  useEffect(() => {
+    async function loadGlobalConfig() {
+      try {
+        const { data, error } = await supabase
+          .from("site_settings")
+          .select("*")
+          .eq("id", "global")
+          .single();
+        if (error && error.code !== "PGRST116") throw error; // ignore no rows error
+        if (data) {
+          setConfig({
+            brandName: data.brand_name || config.brandName,
+            heroQuip: data.hero_quip || config.heroQuip,
+            heroSubtitle: data.hero_subtitle || config.heroSubtitle,
+            aboutDescription: data.about_description || config.aboutDescription,
+            heroImageUrl: data.hero_image_url || config.heroImageUrl,
+            contactNumber: data.contact_number || config.contactNumber,
+            logoUrl: data.logo_url || config.logoUrl,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load global site config", err);
+      }
+    }
+    loadGlobalConfig();
+  }, []);
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link to="/" className="font-display text-lg font-bold tracking-tight">
-          <span className="text-primary">▌</span> {config.brandName}
+        <Link to="/" className="font-display text-lg font-bold tracking-tight flex items-center gap-2">
+          {config.logoUrl ? (
+            <img src={config.logoUrl} alt={config.brandName} className="h-8 w-auto object-contain" />
+          ) : (
+            <><span className="text-primary">▌</span> {config.brandName}</>
+          )}
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
           <Link

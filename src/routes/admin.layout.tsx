@@ -23,6 +23,7 @@ function AdminLayoutEditor() {
   const [contactNumber, setContactNumber] = useState(config.contactNumber || "");
   const [aboutDescription, setAboutDescription] = useState(config.aboutDescription || "");
   const [heroImage, setHeroImage] = useState<File | null>(null);
+  const [logoImage, setLogoImage] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [statusText, setStatusText] = useState("");
 
@@ -62,17 +63,63 @@ function AdminLayoutEditor() {
         }
       }
 
-      setConfig({
+      let logoUrl = config.logoUrl || "";
+
+      if (logoImage) {
+        setStatusText("Uploading site logo...");
+        const uRes = await fetch("/.netlify/functions/get-upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: logoImage.name, contentType: logoImage.type, token }),
+        });
+        const res = await uRes.json();
+        if (res.success && res.uploadUrl) {
+          try {
+            await fetch(res.uploadUrl, {
+              method: "PUT",
+              body: logoImage,
+              headers: { "Content-Type": logoImage.type },
+            });
+            logoUrl = res.publicUrl || "";
+          } catch (putErr) {
+            console.warn("R2 PUT upload failed for logo, falling back to base64", putErr);
+            logoUrl = await fileToDataUrl(logoImage);
+          }
+        } else {
+          console.warn("Cloudflare upload failed, falling back to local base64", res.error);
+          logoUrl = await fileToDataUrl(logoImage);
+        }
+      }
+
+      const newSettings = {
         brandName,
         heroQuip,
         heroSubtitle,
         contactNumber,
         aboutDescription,
         heroImageUrl,
+        logoUrl,
+      };
+
+      // 1. Save globally to Supabase
+      setStatusText("Saving to global database...");
+      const updateRes = await fetch("/.netlify/functions/update-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, settings: newSettings }),
       });
+      const updateData = await updateRes.json();
+      
+      if (!updateData.success) {
+        throw new Error(updateData.error || "Failed to save settings globally");
+      }
+
+      // 2. Update local state
+      setConfig(newSettings);
 
       setStatusText("Saved successfully!");
       setHeroImage(null);
+      setLogoImage(null);
       setTimeout(() => setStatusText(""), 3000);
     } catch (err: unknown) {
       alert("Error saving layout: " + (err as Error).message);
@@ -164,6 +211,26 @@ function AdminLayoutEditor() {
             />
             <p className="text-xs text-muted-foreground">
               Leave empty to keep the current image. Uploading a new image will replace the old one.
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium text-foreground">
+              Site Logo (Optional)
+            </label>
+            {config.logoUrl && !logoImage && (
+              <div className="mb-2 h-16 w-32 rounded-lg border border-border flex items-center justify-center bg-card">
+                <img src={config.logoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setLogoImage(e.target.files?.[0] ?? null)}
+              className="w-full text-muted-foreground file:mr-3 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:py-2 file:font-semibold file:text-secondary-foreground hover:file:opacity-90"
+            />
+            <p className="text-xs text-muted-foreground">
+              Upload a logo image to display in the header instead of the brand name text.
             </p>
           </div>
 

@@ -63,7 +63,7 @@ function StorePage() {
       <SiteHeader />
       <div className="mx-auto max-w-6xl px-6 py-16">
         <span className="font-mono text-xs uppercase tracking-[0.3em] text-primary">
-          // Catalogue
+          Catalogue
         </span>
         <h1 className="font-display mt-2 text-4xl font-bold">Sound packs</h1>
         <p className="mt-2 text-muted-foreground">
@@ -144,8 +144,8 @@ function StorePage() {
 
         <p className="mt-8 text-center text-sm text-muted-foreground">
           Need help?{" "}
-          <Link to="/announcements" className="text-primary hover:underline">
-            Check announcements
+          <Link to="/contact" className="text-primary hover:underline">
+            Contact us
           </Link>
         </p>
       </div>

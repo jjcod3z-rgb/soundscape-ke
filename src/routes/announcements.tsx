@@ -48,7 +48,7 @@ function AnnouncementsPage() {
       <SiteHeader />
       <div className="mx-auto max-w-3xl px-6 py-16">
         <span className="font-mono text-xs uppercase tracking-[0.3em] text-primary">
-          // Updates
+          Updates
         </span>
         <h1 className="font-display mt-2 text-4xl font-bold">Announcements</h1>
         <div className="mt-10 space-y-6">

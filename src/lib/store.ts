@@ -44,6 +44,7 @@ export type SiteConfig = {
   aboutDescription: string;
   heroImageUrl: string;
   contactNumber: string;
+  logoUrl: string;
 };
 
 const KEYS = {
@@ -58,7 +59,7 @@ const KEYS = {
 };
 
 const DEFAULT_CONFIG: SiteConfig = {
-  brandName: "Kelele Sound",
+  brandName: "The-Sound-Scape",
   heroQuip: "Sound that hits like Nairobi at night.",
   heroSubtitle:
     "Premium sound packs and audio loops, crafted in Kenya. Pay in KES, download instantly.",
@@ -66,6 +67,7 @@ const DEFAULT_CONFIG: SiteConfig = {
     "Our unique approach to sound design leverages cutting-edge technology to craft immersive audio experiences. We sell premium audio loops specifically engineered for your projects.\n\nWe utilize advanced synthesis and audio generation techniques to construct highly specific, atmospheric, and punchy audio textures that fit perfectly into interactive environments.\n\nEvery loop is meticulously curated to ensure it meets the rigorous standards of modern productions. Whether you need the ambiance of a bustling Nairobi night or the intense foley of a savanna sequence, our process ensures unparalleled quality and immersion.",
   heroImageUrl: "",
   contactNumber: "+254700213500",
+  logoUrl: "",
 };
 
 function read<T>(key: string, fallback: T): T {
