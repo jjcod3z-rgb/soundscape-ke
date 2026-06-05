@@ -61,6 +61,19 @@ function CartPage() {
     }
     loadPacks();
   }, [cart]);
+
+  const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
+
+  // Read orderId from URL query parameters on mount (e.g. from confirmation email)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlOrderId = params.get("orderId");
+      if (urlOrderId) {
+        setCompletedOrderId(urlOrderId);
+      }
+    }
+  }, []);
   const [, setPurchases] = usePurchases();
   const [, setReceipt] = useLastReceipt();
   const [, setEmails] = useEmails();
@@ -70,7 +83,7 @@ function CartPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
-  const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
+  const [currentOrderId, setCurrentOrderId] = useState<string>("");
   const navigate = useNavigate();
 
   const cartPacks = useMemo(() => packs.filter((p) => cart.includes(p.id)), [packs, cart]);
@@ -122,7 +135,28 @@ function CartPage() {
 
     setBusy(true);
     try {
-      // Call our Netlify Function to create the order
+      // 1. If total is 0, process as a free order directly without PesaPal
+      if (total === 0) {
+        const res = await fetch("/.netlify/functions/process-free-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            name,
+            productId: cartPacks[0]?.id,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success && data.orderId) {
+          handlePaymentSuccess(data.orderId, data.downloadToken);
+        } else {
+          alert("Failed to process free order: " + (data.error || "Unknown error"));
+        }
+        return;
+      }
+
+      // 2. Otherwise process via PesaPal
       const res = await fetch("/.netlify/functions/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,6 +173,7 @@ function CartPage() {
       const data = await res.json();
 
       if (data.success && data.redirectUrl) {
+        setCurrentOrderId(data.orderId);
         setPesapalUrl(data.redirectUrl);
       } else {
         alert("Failed to initialize payment: " + (data.error || "Unknown error"));
@@ -162,8 +197,12 @@ function CartPage() {
     return (
       <PesaPalPortal
         pesapalUrl={pesapalUrl}
+        orderId={currentOrderId}
         onSuccess={handlePaymentSuccess}
-        onClose={() => setPesapalUrl("")}
+        onClose={() => {
+          setPesapalUrl("");
+          setCurrentOrderId("");
+        }}
       />
     );
   }

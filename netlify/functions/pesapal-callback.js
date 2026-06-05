@@ -50,13 +50,56 @@ export const handler = async (event) => {
       updatePayload.download_expires_at = expiresAt.toISOString();
     }
 
-    const { error } = await supabase
+    const { data: order, error: orderErr } = await supabase
       .from("orders")
       .update(updatePayload)
-      .eq("id", OrderMerchantReference);
+      .eq("id", OrderMerchantReference)
+      .select("*, products(name)")
+      .single();
       
-    if (error) {
-      console.error("Supabase update error:", error);
+    if (orderErr) {
+      console.error("Supabase update error:", orderErr);
+    }
+
+    // 2.5 Send Confirmation Email if paid and RESEND_API_KEY is configured
+    if (isCompleted && order && process.env.RESEND_API_KEY) {
+      try {
+        const productName = order.products?.name || "Premium Audio Pack";
+        const downloadLink = `${process.env.URL || "https://the-sound-scape.netlify.app"}/cart?orderId=${order.id}`;
+
+        const emailRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "The-Sound-Scape <onboarding@resend.dev>",
+            to: order.customer_email,
+            subject: `Your Purchase Confirmation — The-Sound-Scape`,
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; rounded: 8px;">
+                <h2 style="color: #10b981;">Thank you for your purchase!</h2>
+                <p>Hi there,</p>
+                <p>Your payment has been successfully confirmed. You bought: <strong>${productName}</strong> for <strong>KES ${order.amount_kes}</strong>.</p>
+                <p>Click the button below to download your audio files immediately:</p>
+                <div style="margin: 30px 0; text-align: center;">
+                  <a href="${downloadLink}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 9999px; font-weight: bold; display: inline-block;">Download Audio Files</a>
+                </div>
+                <p style="color: #666; font-size: 12px;">Note: This link will expire in 7 days for your security.</p>
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                <p style="font-size: 12px; color: #999;">© The-Sound-Scape. Made in Kenya 🇰🇪</p>
+              </div>
+            `,
+          }),
+        });
+
+        if (!emailRes.ok) {
+          console.error("Resend API error:", await emailRes.text());
+        }
+      } catch (emailErr) {
+        console.error("Failed to send email via Resend:", emailErr);
+      }
     }
 
     // 3. Return postMessage HTML to parent window (since this is loaded inside an iframe)

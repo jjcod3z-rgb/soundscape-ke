@@ -2,17 +2,17 @@ import { useEffect, useRef } from "react";
 
 interface PesaPalPortalProps {
   pesapalUrl: string;
+  orderId: string;
   onSuccess: (orderId: string, downloadToken: string) => void;
   onClose: () => void;
 }
 
-export function PesaPalPortal({ pesapalUrl, onSuccess, onClose }: PesaPalPortalProps) {
+export function PesaPalPortal({ pesapalUrl, orderId, onSuccess, onClose }: PesaPalPortalProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
+    // 1. Listen for postMessage from the iframe redirection (if it happens)
     const handler = (e: MessageEvent) => {
-      // Ensure we only process messages from our own domain since the IPN callback 
-      // returns HTML loaded from our own domain endpoint.
       if (e.data?.type === "PAYMENT_SUCCESS") {
         onSuccess(e.data.orderId, e.data.downloadToken);
       }
@@ -21,10 +21,32 @@ export function PesaPalPortal({ pesapalUrl, onSuccess, onClose }: PesaPalPortalP
         onClose();
       }
     };
-    
     window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, [onSuccess, onClose]);
+
+    // 2. Fallback Polling: check order status every 3 seconds in case the iframe doesn't redirect
+    const interval = setInterval(async () => {
+      if (!orderId) return;
+      try {
+        const res = await fetch("/.netlify/functions/check-order-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId }),
+        });
+        const data = await res.json();
+        if (data.success && data.status === "paid" && data.downloadToken) {
+          clearInterval(interval);
+          onSuccess(orderId, data.downloadToken);
+        }
+      } catch (err) {
+        console.error("Error polling order status:", err);
+      }
+    }, 3000);
+
+    return () => {
+      window.removeEventListener("message", handler);
+      clearInterval(interval);
+    };
+  }, [onSuccess, onClose, orderId]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
