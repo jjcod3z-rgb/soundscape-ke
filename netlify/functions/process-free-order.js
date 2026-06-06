@@ -63,11 +63,38 @@ export const handler = async (event) => {
       insertPayload.product_ids = productIds;
     }
 
-    const { data: order, error: orderError } = await supabase
+    let order;
+    let orderError;
+
+    const { data: orderWithIds, error: errWithIds } = await supabase
       .from("orders")
       .insert(insertPayload)
       .select()
       .single();
+
+    order = orderWithIds;
+    orderError = errWithIds;
+
+    // Self-healing fallback if product_ids column does not exist yet
+    if (orderError && (orderError.message.includes("product_ids") || orderError.message.includes("column"))) {
+      console.warn("orders table lacks product_ids column. Retrying free order creation with legacy product_id fallback...");
+      const fallbackPayload = {
+        customer_email: email,
+        product_id: productId || idsToCheck[0],
+        amount_kes: 0,
+        status: "paid",
+        download_token: downloadToken,
+        download_expires_at: expiresAt.toISOString()
+      };
+      const { data: fallbackOrder, error: fallbackErr } = await supabase
+        .from("orders")
+        .insert(fallbackPayload)
+        .select()
+        .single();
+
+      order = fallbackOrder;
+      orderError = fallbackErr;
+    }
 
     if (orderError) {
       throw new Error(`Failed to insert order: ${orderError.message}`);

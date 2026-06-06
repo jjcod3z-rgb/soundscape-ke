@@ -162,3 +162,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
+-- Add product_ids array column to public.orders for multi-product checkout support
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS product_ids uuid[] DEFAULT '{}';
+
+
