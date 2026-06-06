@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 export const Route = createFileRoute("/announcements")({
   head: () => ({
     meta: [
-      { title: "Announcements — Kelele Sound" },
-      { name: "description", content: "Latest news, releases and updates from Kelele Sound." },
+      { title: "Announcements — The Sound Scape" },
+      { name: "description", content: "Latest news, releases and updates from The Sound Scape." },
     ],
   }),
   component: AnnouncementsPage,

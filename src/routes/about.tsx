@@ -3,7 +3,7 @@ import { SiteHeader, SiteFooter } from "@/components/SiteHeader";
 import { useSiteConfig } from "@/lib/store";
 
 export const Route = createFileRoute("/about")({
-  head: () => ({ meta: [{ title: "About Us — Kelele Sound" }] }),
+  head: () => ({ meta: [{ title: "About Us — The Sound Scape" }] }),
   component: AboutPage,
 });
 

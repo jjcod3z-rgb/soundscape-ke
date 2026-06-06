@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 export const Route = createFileRoute("/store")({
   head: () => ({
     meta: [
-      { title: "Store — Kelele Sound" },
+      { title: "Store — The Sound Scape" },
       { name: "description", content: "Browse game sound packs. Pay in KES via Pesapal." },
     ],
   }),

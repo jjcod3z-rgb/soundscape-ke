@@ -39,7 +39,7 @@ function AdminEmails() {
         const formatted: EmailLog[] = (orders || []).map((o: any) => ({
           id: o.id,
           recipient: o.customer_email,
-          subject: `Your Kelele Sound Download Link - Order #${o.pesapal_order_id || o.id.slice(0, 8)}`,
+          subject: `Your The Sound Scape Download Link - Order #${o.pesapal_order_id || o.id.slice(0, 8)}`,
           orderId: o.id,
           status: "sent",
           sentAt: o.created_at,

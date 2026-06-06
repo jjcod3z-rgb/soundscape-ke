@@ -7,16 +7,15 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 async function check() {
   const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .limit(1);
+    .from("site_settings")
+    .select("*");
 
   if (error) {
-    console.error("Error fetching orders:", error);
+    console.error("Error fetching site_settings:", error);
     return;
   }
 
-  console.log("Columns in 'orders' table:", Object.keys(data[0] || {}));
+  console.log("Rows in 'site_settings' table:", data);
 }
 
 check();

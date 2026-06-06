@@ -3,7 +3,7 @@ import { useAdminAuth } from "@/lib/store";
 import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin — Kelele Sound" }] }),
+  head: () => ({ meta: [{ title: "Admin — The Sound Scape" }] }),
   component: AdminLayout,
 });
 

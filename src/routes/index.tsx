@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Kelele Sound — Game Sound Packs from Kenya" },
+      { title: "The Sound Scape — Game Sound Packs from Kenya" },
       {
         name: "description",
         content:

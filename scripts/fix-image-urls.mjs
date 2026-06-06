@@ -101,6 +101,53 @@ async function run() {
     }
   }
 
+  console.log("Done checking products.\n");
+
+  console.log("--- Checking 'site_settings' table ---");
+  const { data: settings, error: settingsErr } = await supabase
+    .from("site_settings")
+    .select("id, logo_url, hero_image_url");
+
+  if (settingsErr) {
+    console.error("❌ Failed to fetch site_settings:", settingsErr.message);
+  } else {
+    for (const s of settings) {
+      const updates = {};
+      let changed = false;
+
+      const newLogo = rewrite(s.logo_url);
+      if (newLogo !== s.logo_url) {
+        console.log(`  [site_settings] logo_url: ${s.logo_url}`);
+        console.log(`                  → ${newLogo}`);
+        updates.logo_url = newLogo;
+        changed = true;
+      }
+
+      const newHero = rewrite(s.hero_image_url);
+      if (newHero !== s.hero_image_url) {
+        console.log(`  [site_settings] hero_image_url: ${s.hero_image_url}`);
+        console.log(`                  → ${newHero}`);
+        updates.hero_image_url = newHero;
+        changed = true;
+      }
+
+      if (changed) {
+        const { error: updateErr } = await supabase
+          .from("site_settings")
+          .update(updates)
+          .eq("id", s.id);
+
+        if (updateErr) {
+          console.error(`  ❌ Failed to update site_settings:`, updateErr.message);
+        } else {
+          console.log(`  ✅ site_settings updated successfully.\n`);
+        }
+      } else {
+        console.log(`  ✔  site_settings already OK.\n`);
+      }
+    }
+  }
+
   console.log("Done.");
 }
 

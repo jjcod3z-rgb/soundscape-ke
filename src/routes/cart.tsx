@@ -18,7 +18,7 @@ import { DownloadManager } from "@/components/DownloadManager";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({
-    meta: [{ title: "Your Cart — Kelele Sound" }],
+    meta: [{ title: "Your Cart — The Sound Scape" }],
   }),
   component: CartPage,
 });

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SiteHeader, SiteFooter } from "@/components/SiteHeader";
 
 export const Route = createFileRoute("/contact")({
-  head: () => ({ meta: [{ title: "Contact Me — Kelele Sound" }] }),
+  head: () => ({ meta: [{ title: "Contact Me — The Sound Scape" }] }),
   component: ContactPage,
 });
 
