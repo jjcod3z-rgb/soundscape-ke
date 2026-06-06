@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader, SiteFooter } from "@/components/SiteHeader";
-import { useSiteConfig, formatKES, type Pack } from "@/lib/store";
+import { useSiteConfig, formatKES, getPublicUrl, type Pack } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 
@@ -83,7 +83,7 @@ function HomePage() {
         className="relative overflow-hidden bg-cover bg-center"
         style={{
           backgroundImage: config.heroImageUrl
-            ? `linear-gradient(to right, rgba(0,0,0,0.8), rgba(0,0,0,0.4)), url(${config.heroImageUrl})`
+            ? `linear-gradient(to right, rgba(0,0,0,0.8), rgba(0,0,0,0.4)), url(${getPublicUrl(config.heroImageUrl)})`
             : "var(--gradient-hero)",
         }}
       >
@@ -148,7 +148,7 @@ function HomePage() {
                   style={
                     p.coverDataUrl
                       ? {
-                          backgroundImage: `url(${p.coverDataUrl})`,
+                          backgroundImage: `url(${getPublicUrl(p.coverDataUrl)})`,
                           backgroundSize: "cover",
                           backgroundPosition: "center",
                         }

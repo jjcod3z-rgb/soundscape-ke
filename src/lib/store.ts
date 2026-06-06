@@ -192,3 +192,18 @@ export function readPurchaseById(id: string): Purchase | null {
 export function readPackById(id: string): Pack | null {
   return read<Pack[]>(KEYS.packs, seedPacks()).find((p) => p.id === id) ?? null;
 }
+
+export function getPublicUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  const publicBase = (import.meta.env.VITE_R2_PUBLIC_URL || "").replace(/\/$/, "");
+  if (!publicBase) return url;
+
+  if (url.includes(".r2.cloudflarestorage.com/")) {
+    const parts = url.split(".r2.cloudflarestorage.com/");
+    const path = parts[1];
+    const cleanPath = path.startsWith("soundscape/") ? path.replace(/^soundscape\//, "") : path;
+    return `${publicBase}/${cleanPath}`;
+  }
+  return url;
+}
+

@@ -37,15 +37,18 @@ export const handler = async (event) => {
 
     const uploadUrl = await getSignedUrl(client, command, { expiresIn: 3600 });
     
-    // Construct the direct access URL for R2
-    const publicUrl = process.env.R2_PUBLIC_URL
-      ? `${process.env.R2_PUBLIC_URL}/${key}`
-      : uploadUrl.split("?")[0];
+    // Construct the publicly accessible URL for storing in the DB.
+    // Priority: explicit R2_PUBLIC_URL > fall back to the private r2.cloudflarestorage.com URL
+    // (the frontend getPublicUrl() helper will rewrite private URLs using VITE_R2_PUBLIC_URL at display time)
+    const publicBase = (process.env.R2_PUBLIC_URL || "").replace(/\/$/, "");
+    const publicUrl = publicBase
+      ? `${publicBase}/${key}`
+      : uploadUrl.split("?")[0]; // private URL — getPublicUrl() on frontend will rewrite this
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ success: true, uploadUrl, publicUrl }),
+      body: JSON.stringify({ success: true, uploadUrl, publicUrl, key }),
     };
   } catch (err) {
     console.error("Upload URL generation error:", err);

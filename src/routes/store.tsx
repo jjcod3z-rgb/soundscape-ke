@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader, SiteFooter } from "@/components/SiteHeader";
-import { useCart, formatKES, type Pack } from "@/lib/store";
+import { useCart, formatKES, getPublicUrl, type Pack } from "@/lib/store";
 import { useMemo, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -92,7 +92,7 @@ function StorePage() {
                     style={
                       p.coverDataUrl
                         ? {
-                            backgroundImage: `url(${p.coverDataUrl})`,
+                            backgroundImage: `url(${getPublicUrl(p.coverDataUrl)})`,
                             backgroundSize: "cover",
                             backgroundPosition: "center",
                           }

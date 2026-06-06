@@ -19,7 +19,7 @@ export const handler = async (event) => {
 
   try {
     const supabase = getSupabaseClient();
-    const { amount, description, email, name, productId, callbackUrl } = JSON.parse(event.body);
+    const { amount, description, email, name, productId, productIds, callbackUrl } = JSON.parse(event.body);
 
     // 1. Get Pesapal Auth Token
     const token = await getPesapalToken();
@@ -34,34 +34,42 @@ export const handler = async (event) => {
     const ipnData = await ipnRes.json();
     const ipnId = ipnData.ipn_id || ipnData.error?.message?.ipn_id || "fallback-id";
 
-    // 3. Inventory Guard — check stock before creating the order
-    const { data: product, error: productFetchErr } = await supabase
+    // 3. Inventory Guard — check stock for all items before creating the order
+    const idsToCheck = Array.isArray(productIds) && productIds.length > 0 ? productIds : [productId];
+    
+    const { data: products, error: productFetchErr } = await supabase
       .from("products")
-      .select("max_purchases, total_purchases, is_active")
-      .eq("id", productId)
-      .single();
+      .select("id, name, max_purchases, total_purchases, is_active")
+      .in("id", idsToCheck);
 
-    if (productFetchErr || !product) {
-      throw new Error("Product not found or unavailable.");
+    if (productFetchErr || !products || products.length === 0) {
+      throw new Error("One or more products not found or unavailable.");
     }
 
-    if (!product.is_active) {
-      throw new Error("This product is no longer available.");
-    }
-
-    if (product.max_purchases !== null && product.total_purchases >= product.max_purchases) {
-      throw new Error("Sorry, this pack is sold out. No more copies are available.");
+    for (const prod of products) {
+      if (!prod.is_active) {
+        throw new Error(`The pack "${prod.name}" is no longer available.`);
+      }
+      if (prod.max_purchases !== null && prod.total_purchases >= prod.max_purchases) {
+        throw new Error(`Sorry, the pack "${prod.name}" is sold out.`);
+      }
     }
 
     // 4. Create Order in Supabase
+    const insertPayload = {
+      customer_email: email,
+      product_id: productId,
+      amount_kes: amount,
+      status: "pending"
+    };
+
+    if (Array.isArray(productIds) && productIds.length > 0) {
+      insertPayload.product_ids = productIds;
+    }
+
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .insert({
-        customer_email: email,
-        product_id: productId,
-        amount_kes: amount,
-        status: "pending"
-      })
+      .insert(insertPayload)
       .select()
       .single();
 

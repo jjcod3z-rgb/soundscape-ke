@@ -24,7 +24,7 @@ export const handler = async (event) => {
     // 1. Verify order exists and is paid
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("*, products(*)")
+      .select("*")
       .eq("id", orderId)
       .single();
 
@@ -36,17 +36,36 @@ export const handler = async (event) => {
       return { statusCode: 410, body: JSON.stringify({ error: "Download link expired" }) };
     }
 
-    // 2. Generate signed URLs for individual files
-    const product = order.products;
+    // 2. Fetch all products in this order
+    const ids = Array.isArray(order.product_ids) && order.product_ids.length > 0
+      ? order.product_ids
+      : [order.product_id].filter(Boolean);
 
-    if (!product) {
-      return { statusCode: 404, body: JSON.stringify({ error: "Product not found" }) };
+    if (ids.length === 0) {
+      return { statusCode: 404, body: JSON.stringify({ error: "No products associated with this order" }) };
     }
 
-    const filesToSign = Array.isArray(product.r2_product_urls) ? product.r2_product_urls : [];
+    const { data: products, error: productsErr } = await supabase
+      .from("products")
+      .select("*")
+      .in("id", ids);
+
+    if (productsErr || !products || products.length === 0) {
+      return { statusCode: 404, body: JSON.stringify({ error: "Products not found" }) };
+    }
+
+    // 3. Gather files to sign from all products
+    const filesToSign = [];
+    const productNames = [];
+    for (const p of products) {
+      productNames.push(p.name);
+      if (Array.isArray(p.r2_product_urls)) {
+        filesToSign.push(...p.r2_product_urls);
+      }
+    }
 
     if (filesToSign.length === 0) {
-      return { statusCode: 404, body: JSON.stringify({ error: "No files found for this product" }) };
+      return { statusCode: 404, body: JSON.stringify({ error: "No files found for the products in this order" }) };
     }
 
     const signedFiles = await Promise.all(
@@ -87,10 +106,10 @@ export const handler = async (event) => {
       })
     );
 
-    // 3. Return files + receipt metadata
+    // 4. Return files + receipt metadata
     const receiptData = {
       orderId: order.id,
-      productName: product.name,
+      productName: productNames.join(", "),
       amountKes: order.amount_kes,
       customerEmail: order.customer_email,
       purchaseDate: order.created_at,

@@ -8,9 +8,9 @@ export const handler = async (event) => {
 
   try {
     const supabase = getSupabaseClient();
-    const { email, name, productId } = JSON.parse(event.body);
+    const { email, name, productId, productIds } = JSON.parse(event.body);
 
-    if (!email || !name || !productId) {
+    if (!email || !name || (!productId && (!productIds || productIds.length === 0))) {
       return {
         statusCode: 400,
         headers: { "Content-Type": "application/json" },
@@ -18,27 +18,30 @@ export const handler = async (event) => {
       };
     }
 
-    // 1. Verify the product is actually free
-    const { data: product, error: productErr } = await supabase
+    const idsToCheck = Array.isArray(productIds) && productIds.length > 0 ? productIds : [productId];
+
+    // 1. Verify all products are actually free
+    const { data: products, error: productsErr } = await supabase
       .from("products")
       .select("name, price_kes")
-      .eq("id", productId)
-      .single();
+      .in("id", idsToCheck);
 
-    if (productErr || !product) {
+    if (productsErr || !products || products.length === 0) {
       return {
         statusCode: 404,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Product not found" }),
+        body: JSON.stringify({ error: "One or more products not found" }),
       };
     }
 
-    if (product.price_kes !== 0) {
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Product is not free. Checkout via PesaPal is required." }),
-      };
+    for (const p of products) {
+      if (p.price_kes !== 0) {
+        return {
+          statusCode: 400,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ error: `Product "${p.name}" is not free. Checkout via PesaPal is required.` }),
+        };
+      }
     }
 
     // 2. Generate download token and expiry
@@ -47,16 +50,22 @@ export const handler = async (event) => {
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
 
     // 3. Create the paid order directly
+    const insertPayload = {
+      customer_email: email,
+      product_id: productId || idsToCheck[0],
+      amount_kes: 0,
+      status: "paid",
+      download_token: downloadToken,
+      download_expires_at: expiresAt.toISOString()
+    };
+
+    if (Array.isArray(productIds) && productIds.length > 0) {
+      insertPayload.product_ids = productIds;
+    }
+
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .insert({
-        customer_email: email,
-        product_id: productId,
-        amount_kes: 0,
-        status: "paid",
-        download_token: downloadToken,
-        download_expires_at: expiresAt.toISOString()
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
@@ -69,6 +78,7 @@ export const handler = async (event) => {
       try {
         const downloadLink = `${process.env.URL || "https://the-sound-scape.netlify.app"}/cart?orderId=${order.id}`;
 
+        const productNames = products.map((p) => p.name).join(", ");
         const emailRes = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
@@ -83,7 +93,7 @@ export const handler = async (event) => {
               <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; rounded: 8px;">
                 <h2 style="color: #10b981;">Your download is ready!</h2>
                 <p>Hi there,</p>
-                <p>You have successfully claimed your free pack: <strong>${product.name || "Free Audio Pack"}</strong>.</p>
+                <p>You have successfully claimed: <strong>${productNames || "Free Audio Pack"}</strong>.</p>
                 <p>Click the button below to download your audio files immediately:</p>
                 <div style="margin: 30px 0; text-align: center;">
                   <a href="${downloadLink}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 9999px; font-weight: bold; display: inline-block;">Download Audio Files</a>

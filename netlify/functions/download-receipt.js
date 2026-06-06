@@ -11,10 +11,10 @@ export const handler = async (event) => {
       return { statusCode: 400, body: "Missing orderId" };
     }
 
-    // 1. Fetch order + product details
+    // 1. Fetch order details
     const { data: order, error } = await supabase
       .from("orders")
-      .select("*, products(name)")
+      .select("*")
       .eq("id", orderId)
       .single();
 
@@ -22,7 +22,21 @@ export const handler = async (event) => {
       return { statusCode: 403, body: "Invalid or unpaid order" };
     }
 
-    const productName = order.products?.name || "Premium Audio Pack";
+    // Fetch all products in this order
+    const ids = Array.isArray(order.product_ids) && order.product_ids.length > 0
+      ? order.product_ids
+      : [order.product_id].filter(Boolean);
+
+    let productNames = "Premium Audio Pack";
+    if (ids.length > 0) {
+      const { data: products } = await supabase
+        .from("products")
+        .select("name")
+        .in("id", ids);
+      if (products && products.length > 0) {
+        productNames = products.map((p) => p.name).join(", ");
+      }
+    }
     const purchaseDate = new Date(order.created_at).toUTCString();
     const siteUrl = process.env.URL || "https://the-sound-scape.netlify.app";
     const redownloadUrl = `${siteUrl}/cart?orderId=${order.id}`;
@@ -44,7 +58,7 @@ export const handler = async (event) => {
 
   PURCHASE DETAILS
   ─────────────────────────────────────────────────────────────
-  Product       : ${productName}
+  Product       : ${productNames}
   Amount        : KES ${order.amount_kes.toLocaleString()}
 
   RE-DOWNLOAD

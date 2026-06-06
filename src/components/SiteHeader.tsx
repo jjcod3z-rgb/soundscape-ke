@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useSiteConfig, useCart } from "@/lib/store";
+import { useSiteConfig, useCart, getPublicUrl } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { useEffect } from "react";
 
@@ -38,7 +38,7 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link to="/" className="font-display text-lg font-bold tracking-tight flex items-center gap-2">
           {config.logoUrl ? (
-            <img src={config.logoUrl} alt={config.brandName} className="h-8 w-auto object-contain" />
+            <img src={getPublicUrl(config.logoUrl)} alt={config.brandName} className="h-8 w-auto object-contain" />
           ) : (
             <><span className="text-primary">▌</span> {config.brandName}</>
           )}

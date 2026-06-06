@@ -144,6 +144,7 @@ function CartPage() {
             email,
             name,
             productId: cartPacks[0]?.id,
+            productIds: cart,
           }),
         });
 
@@ -165,7 +166,8 @@ function CartPage() {
           description: `${config.brandName} - ${cartPacks.length} packs`,
           email,
           name,
-          productId: cartPacks[0]?.id, // For single-product orders; multi-product needs expansion
+          productId: cartPacks[0]?.id,
+          productIds: cart,
           callbackUrl: `${window.location.origin}/.netlify/functions/pesapal-callback`,
         }),
       });

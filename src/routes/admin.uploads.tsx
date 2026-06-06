@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { formatKES, useAdminAuth } from "@/lib/store";
+import { formatKES, useAdminAuth, getPublicUrl } from "@/lib/store";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -33,16 +33,27 @@ async function uploadFile(file: File, token: string): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ filename: file.name, contentType: file.type || "application/octet-stream", token }),
   });
-  const res = await uRes.json();
-  if (res.success && res.uploadUrl) {
-    try {
-      await fetch(res.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
-      return res.publicUrl;
-    } catch {
-      return fileToDataUrl(file);
-    }
+
+  if (!uRes.ok) {
+    throw new Error(`Failed to get upload URL for "${file.name}" (${uRes.status})`);
   }
-  return fileToDataUrl(file);
+
+  const res = await uRes.json();
+  if (!res.success || !res.uploadUrl) {
+    throw new Error(`Upload URL error for "${file.name}": ${res.error || "Unknown error"}`);
+  }
+
+  const putRes = await fetch(res.uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+  });
+
+  if (!putRes.ok) {
+    throw new Error(`Failed to upload "${file.name}" to storage (HTTP ${putRes.status}). Check R2 CORS settings.`);
+  }
+
+  return res.publicUrl;
 }
 
 // ─── EDIT MODAL ────────────────────────────────────────────────────────────────
@@ -184,7 +195,7 @@ function EditModal({ pack, token, onSave, onClose }: {
           <div className="space-y-1">
             <label className="text-sm font-medium">Replace Cover Image (optional)</label>
             {pack.coverDataUrl && !coverFile && (
-              <img src={pack.coverDataUrl} alt="" className="h-20 w-20 rounded-lg object-cover bg-muted mb-1" />
+              <img src={getPublicUrl(pack.coverDataUrl)} alt="" className="h-20 w-20 rounded-lg object-cover bg-muted mb-1" />
             )}
             <input
               type="file"
@@ -488,7 +499,7 @@ function AdminUploads() {
                   <div className="flex gap-4">
                     {/* Cover */}
                     {p.coverDataUrl ? (
-                      <img src={p.coverDataUrl} alt={p.title} className="h-20 w-20 rounded-lg object-cover bg-muted shrink-0" />
+                      <img src={getPublicUrl(p.coverDataUrl)} alt={p.title} className="h-20 w-20 rounded-lg object-cover bg-muted shrink-0" />
                     ) : (
                       <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center text-xs text-muted-foreground shrink-0">
                         No img

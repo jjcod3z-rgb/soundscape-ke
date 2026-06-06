@@ -54,24 +54,43 @@ export const handler = async (event) => {
       .from("orders")
       .update(updatePayload)
       .eq("id", OrderMerchantReference)
-      .select("*, products(name)")
+      .select("*")
       .single();
       
     if (orderErr) {
       console.error("Supabase update error:", orderErr);
     }
 
-    // Increment total_purchases on the product
-    if (isCompleted && order?.product_id) {
-      await supabase.rpc("increment_product_purchases", { product_id: order.product_id }).catch((err) =>
-        console.error("Failed to increment total_purchases:", err)
-      );
+    // Resolve product IDs
+    const ids = order
+      ? (Array.isArray(order.product_ids) && order.product_ids.length > 0
+        ? order.product_ids
+        : [order.product_id].filter(Boolean))
+      : [];
+
+    // Increment total_purchases on all products in this order
+    if (isCompleted && ids.length > 0) {
+      for (const pid of ids) {
+        await supabase.rpc("increment_product_purchases", { product_id: pid }).catch((err) =>
+          console.error("Failed to increment total_purchases for product ID:", pid, err)
+        );
+      }
     }
 
     // 2.5 Send Confirmation Email if paid and RESEND_API_KEY is configured
     if (isCompleted && order && process.env.RESEND_API_KEY) {
       try {
-        const productName = order.products?.name || "Premium Audio Pack";
+        let productNames = "Premium Audio Pack";
+        if (ids.length > 0) {
+          const { data: products } = await supabase
+            .from("products")
+            .select("name")
+            .in("id", ids);
+          if (products && products.length > 0) {
+            productNames = products.map((p) => p.name).join(", ");
+          }
+        }
+
         const downloadLink = `${process.env.URL || "https://the-sound-scape.netlify.app"}/cart?orderId=${order.id}`;
 
         const emailRes = await fetch("https://api.resend.com/emails", {
@@ -88,7 +107,7 @@ export const handler = async (event) => {
               <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; rounded: 8px;">
                 <h2 style="color: #10b981;">Thank you for your purchase!</h2>
                 <p>Hi there,</p>
-                <p>Your payment has been successfully confirmed. You bought: <strong>${productName}</strong> for <strong>KES ${order.amount_kes}</strong>.</p>
+                <p>Your payment has been successfully confirmed. You bought: <strong>${productNames}</strong> for <strong>KES ${order.amount_kes}</strong>.</p>
                 <p>Click the button below to download your audio files immediately:</p>
                 <div style="margin: 30px 0; text-align: center;">
                   <a href="${downloadLink}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 9999px; font-weight: bold; display: inline-block;">Download Audio Files</a>
