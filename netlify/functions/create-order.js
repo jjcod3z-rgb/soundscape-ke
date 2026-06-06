@@ -34,7 +34,26 @@ export const handler = async (event) => {
     const ipnData = await ipnRes.json();
     const ipnId = ipnData.ipn_id || ipnData.error?.message?.ipn_id || "fallback-id";
 
-    // 3. Create Order in Supabase
+    // 3. Inventory Guard — check stock before creating the order
+    const { data: product, error: productFetchErr } = await supabase
+      .from("products")
+      .select("max_purchases, total_purchases, is_active")
+      .eq("id", productId)
+      .single();
+
+    if (productFetchErr || !product) {
+      throw new Error("Product not found or unavailable.");
+    }
+
+    if (!product.is_active) {
+      throw new Error("This product is no longer available.");
+    }
+
+    if (product.max_purchases !== null && product.total_purchases >= product.max_purchases) {
+      throw new Error("Sorry, this pack is sold out. No more copies are available.");
+    }
+
+    // 4. Create Order in Supabase
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({

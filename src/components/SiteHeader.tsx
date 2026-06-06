@@ -99,7 +99,16 @@ export function SiteFooter() {
   const [config] = useSiteConfig();
   return (
     <footer className="mt-32 border-t border-border/60 py-10 text-center text-sm text-muted-foreground">
-      © {new Date().getFullYear()} {config.brandName} · Made in Kenya 🇰🇪
+      <p>© {new Date().getFullYear()} {config.brandName} · Made in Kenya 🇰🇪</p>
+      <p className="mt-2">
+        <Link to="/redownload" className="hover:text-foreground transition underline underline-offset-4">
+          Re-download your files
+        </Link>
+        {" · "}
+        <Link to="/contact" className="hover:text-foreground transition underline underline-offset-4">
+          Support
+        </Link>
+      </p>
     </footer>
   );
 }

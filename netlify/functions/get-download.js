@@ -49,45 +49,59 @@ export const handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ error: "No files found for this product" }) };
     }
 
-    const files = filesToSign.map(async (f) => {
-      let key = "";
-      try {
-        const urlObj = new URL(f.url);
-        if (urlObj.hostname.includes("r2.cloudflarestorage.com")) {
+    const signedFiles = await Promise.all(
+      filesToSign.map(async (f) => {
+        let key = "";
+        try {
+          const urlObj = new URL(f.url);
+          if (urlObj.hostname.includes("r2.cloudflarestorage.com")) {
             const pathParts = urlObj.pathname.split("/").filter(Boolean);
             if (pathParts[0] === process.env.R2_BUCKET_NAME) {
-               key = pathParts.slice(1).join("/");
+              key = pathParts.slice(1).join("/");
             } else {
-               key = pathParts.join("/");
+              key = pathParts.join("/");
             }
-        } else if (process.env.R2_PUBLIC_URL && f.url.startsWith(process.env.R2_PUBLIC_URL)) {
+          } else if (process.env.R2_PUBLIC_URL && f.url.startsWith(process.env.R2_PUBLIC_URL)) {
             key = f.url.substring(process.env.R2_PUBLIC_URL.length).replace(/^\//, "");
+          }
+        } catch (e) {
+          // If it's a data URI or invalid URL, we can't sign it.
         }
-      } catch (e) {
-        // If it's a data URI or invalid URL, we can't sign it.
-      }
 
-      if (!key) {
-        return { name: f.name, signedUrl: f.url, type: "audio" };
-      }
+        if (!key) {
+          return { name: f.name, signedUrl: f.url, type: "audio" };
+        }
 
-      const command = new GetObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: key,
-      });
-      
-      try {
-        const url = await getSignedUrl(r2, command, { expiresIn: 3600 });
-        return { name: f.name, signedUrl: url, type: "audio" };
-      } catch (err) {
-        console.error("Error signing url for key:", key, err);
-        return { name: f.name, signedUrl: null, error: "Failed to generate link" };
-      }
-    });
+        const command = new GetObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: key,
+        });
 
-    const signedFiles = await Promise.all(files);
+        try {
+          const url = await getSignedUrl(r2, command, { expiresIn: 3600 });
+          return { name: f.name, signedUrl: url, type: "audio" };
+        } catch (err) {
+          console.error("Error signing url for key:", key, err);
+          return { name: f.name, signedUrl: null, error: "Failed to generate link" };
+        }
+      })
+    );
 
-    return { statusCode: 200, body: JSON.stringify({ files: signedFiles }) };
+    // 3. Return files + receipt metadata
+    const receiptData = {
+      orderId: order.id,
+      productName: product.name,
+      amountKes: order.amount_kes,
+      customerEmail: order.customer_email,
+      purchaseDate: order.created_at,
+      fileCount: signedFiles.length,
+    };
+
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: signedFiles, receipt: receiptData }),
+    };
   } catch (error) {
     console.error("Get download error:", error);
     return { statusCode: 500, body: JSON.stringify({ error: "Internal Server Error" }) };

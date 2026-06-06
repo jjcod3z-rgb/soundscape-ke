@@ -141,3 +141,24 @@ create policy "Public can read site settings" on public.site_settings for select
 
 -- Insert default row
 insert into public.site_settings (id) values ('global') on conflict (id) do nothing;
+
+
+-- ============================================================
+-- 6. INVENTORY CONTROLS & UTILITIES
+-- ============================================================
+
+-- Add inventory columns to products table
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS max_purchases integer DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS total_purchases integer NOT NULL DEFAULT 0;
+
+-- Function to atomically increment product purchase count
+CREATE OR REPLACE FUNCTION increment_product_purchases(product_id uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE public.products
+  SET total_purchases = total_purchases + 1
+  WHERE id = product_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+

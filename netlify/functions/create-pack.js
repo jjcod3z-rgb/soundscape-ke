@@ -8,7 +8,7 @@ export const handler = async (event) => {
 
   try {
     const supabase = getSupabaseClient();
-    const { title, description, price, coverUrl, files, token } = JSON.parse(event.body);
+    const { title, description, price, coverUrl, files, maxPurchases, token } = JSON.parse(event.body);
 
     // 1. Verify admin token
     jwt.verify(token, JWT_SECRET);
@@ -29,6 +29,8 @@ export const handler = async (event) => {
         r2_preview_url: coverUrl || null,
         r2_product_urls: Array.isArray(files) ? files : [],
         is_active: true,
+        max_purchases: maxPurchases !== undefined ? (maxPurchases === null ? null : parseInt(maxPurchases, 10)) : null,
+        total_purchases: 0,
       })
       .select()
       .single();

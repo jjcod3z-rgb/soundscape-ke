@@ -61,6 +61,13 @@ export const handler = async (event) => {
       console.error("Supabase update error:", orderErr);
     }
 
+    // Increment total_purchases on the product
+    if (isCompleted && order?.product_id) {
+      await supabase.rpc("increment_product_purchases", { product_id: order.product_id }).catch((err) =>
+        console.error("Failed to increment total_purchases:", err)
+      );
+    }
+
     // 2.5 Send Confirmation Email if paid and RESEND_API_KEY is configured
     if (isCompleted && order && process.env.RESEND_API_KEY) {
       try {

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StoreRouteImport } from './routes/store'
+import { Route as RedownloadRouteImport } from './routes/redownload'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
@@ -26,6 +27,11 @@ import { Route as AdminAnnouncementsRouteImport } from './routes/admin.announcem
 const StoreRoute = StoreRouteImport.update({
   id: '/store',
   path: '/store',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RedownloadRoute = RedownloadRouteImport.update({
+  id: '/redownload',
+  path: '/redownload',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/announcements': typeof AnnouncementsRoute
   '/cart': typeof CartRoute
   '/contact': typeof ContactRoute
+  '/redownload': typeof RedownloadRoute
   '/store': typeof StoreRoute
   '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/emails': typeof AdminEmailsRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/announcements': typeof AnnouncementsRoute
   '/cart': typeof CartRoute
   '/contact': typeof ContactRoute
+  '/redownload': typeof RedownloadRoute
   '/store': typeof StoreRoute
   '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/emails': typeof AdminEmailsRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/announcements': typeof AnnouncementsRoute
   '/cart': typeof CartRoute
   '/contact': typeof ContactRoute
+  '/redownload': typeof RedownloadRoute
   '/store': typeof StoreRoute
   '/admin/announcements': typeof AdminAnnouncementsRoute
   '/admin/emails': typeof AdminEmailsRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/announcements'
     | '/cart'
     | '/contact'
+    | '/redownload'
     | '/store'
     | '/admin/announcements'
     | '/admin/emails'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/announcements'
     | '/cart'
     | '/contact'
+    | '/redownload'
     | '/store'
     | '/admin/announcements'
     | '/admin/emails'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/announcements'
     | '/cart'
     | '/contact'
+    | '/redownload'
     | '/store'
     | '/admin/announcements'
     | '/admin/emails'
@@ -188,6 +200,7 @@ export interface RootRouteChildren {
   AnnouncementsRoute: typeof AnnouncementsRoute
   CartRoute: typeof CartRoute
   ContactRoute: typeof ContactRoute
+  RedownloadRoute: typeof RedownloadRoute
   StoreRoute: typeof StoreRoute
 }
 
@@ -198,6 +211,13 @@ declare module '@tanstack/react-router' {
       path: '/store'
       fullPath: '/store'
       preLoaderRoute: typeof StoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/redownload': {
+      id: '/redownload'
+      path: '/redownload'
+      fullPath: '/redownload'
+      preLoaderRoute: typeof RedownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -314,6 +334,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnnouncementsRoute: AnnouncementsRoute,
   CartRoute: CartRoute,
   ContactRoute: ContactRoute,
+  RedownloadRoute: RedownloadRoute,
   StoreRoute: StoreRoute,
 }
 export const routeTree = rootRouteImport
