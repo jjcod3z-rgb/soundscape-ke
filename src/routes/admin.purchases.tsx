@@ -28,24 +28,54 @@ function AdminPurchases() {
   useEffect(() => {
     async function loadPurchases() {
       try {
+        // Fetch all orders (no FK join — product_ids is an array, joins only work on single FKs)
         const { data: rawOrders, error } = await supabase
           .from("orders")
-          .select("*, products(name)")
+          .select("*")
           .order("created_at", { ascending: false });
 
         if (error) throw error;
 
-        const formatted: OrderRow[] = (rawOrders || []).map((row: any) => ({
-          id: row.id,
-          customer_email: row.customer_email,
-          customer_phone: row.customer_phone,
-          amount_kes: row.amount_kes,
-          pesapal_order_id: row.pesapal_order_id,
-          status: row.status,
-          download_token: row.download_token,
-          created_at: row.created_at,
-          product_name: row.products?.name || "Unknown Product",
-        }));
+        // Collect every unique product ID across all orders
+        const allProductIds = new Set<string>();
+        for (const row of rawOrders || []) {
+          if (Array.isArray(row.product_ids)) {
+            row.product_ids.forEach((id: string) => allProductIds.add(id));
+          }
+          if (row.product_id) allProductIds.add(row.product_id);
+        }
+
+        // Batch-fetch product names
+        const productMap: Record<string, string> = {};
+        if (allProductIds.size > 0) {
+          const { data: products } = await supabase
+            .from("products")
+            .select("id, name")
+            .in("id", Array.from(allProductIds));
+          for (const p of products || []) {
+            productMap[p.id] = p.name;
+          }
+        }
+
+        const formatted: OrderRow[] = (rawOrders || []).map((row: any) => {
+          // Resolve names: prefer product_ids array, fall back to product_id
+          const ids: string[] = Array.isArray(row.product_ids) && row.product_ids.length > 0
+            ? row.product_ids
+            : row.product_id ? [row.product_id] : [];
+          const productName = ids.map((id) => productMap[id] || id).join(", ") || "Unknown Product";
+
+          return {
+            id: row.id,
+            customer_email: row.customer_email,
+            customer_phone: row.customer_phone,
+            amount_kes: row.amount_kes,
+            pesapal_order_id: row.pesapal_order_id,
+            status: row.status,
+            download_token: row.download_token,
+            created_at: row.created_at,
+            product_name: productName,
+          };
+        });
 
         setOrders(formatted);
       } catch (err) {
